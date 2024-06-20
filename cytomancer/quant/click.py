@@ -3,7 +3,7 @@ import joblib
 from pathlib import Path
 import click
 
-from distributed import LocalCluster, Client
+from dask.distributed import LocalCluster, Client
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.experiment import ExperimentType
 from cytomancer.config import config
@@ -71,4 +71,4 @@ def register(cli: click.Group):
 
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
-    quant_group.add_command(neurite_quant)
+    # quant_group.add_command(neurite_quant)

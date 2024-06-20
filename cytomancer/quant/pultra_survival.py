@@ -13,7 +13,6 @@ import xarray as xr
 import pandas as pd
 import numpy as np
 
-from cytomancer.utils import iter_idx_prod
 from cytomancer.utils import load_experiment
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType, Axes
@@ -165,6 +164,7 @@ def run(
         # faster to run many CPU workers in parallel
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
         logging.basicConfig(level=config.log_level, format=fmt)
         logging.getLogger("dask").setLevel(level=logging.WARN)
         logging.getLogger("distributed.nanny").setLevel(level=logging.WARN)
@@ -204,16 +204,16 @@ def run(
     model = StarDist2D.from_pretrained("2D_versatile_fluo")
 
     assert model is not None, "Could not load stardist model"
-    counts = quantify(intensity, model, classifier, dataset).load()
 
-    rows = []
-    for ts in iter_idx_prod(counts, ignore_dims=[Axes.TIME]):
-        well = ts[Axes.REGION].values
-        field = ts[Axes.FIELD].values
-        for time in ts[Axes.TIME]:
-            count = ts.sel({Axes.TIME: time}).values
-            rows.append({"well": well, "field": field, "time": time.values, "count": count})
+    (
+        quantify(intensity, model, classifier, dataset)
+        .rename({
+            Axes.TIME: "time",
+            Axes.REGION: "well",
+            Axes.FIELD: "field"
+        })
+        .to_dataframe("count")
+        .to_csv(results_dir / "survival.csv", index=False)
+    )
 
-    df = pd.DataFrame(rows)
-    df.to_csv(results_dir / "survival.csv", index=False)
-    logger.info(f"Finished processing {experiment_path}")
+    logger.info(f"Finished analysis of {experiment_path}")
