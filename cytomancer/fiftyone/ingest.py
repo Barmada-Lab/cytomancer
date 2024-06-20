@@ -3,20 +3,15 @@ from pathlib import Path
 import logging
 import uuid
 
-import dask
-from tqdm import tqdm
-import tifffile
-import fiftyone as fo
-from fiftyone import ViewField as F
-import xarray as xr
-from PIL import Image
 from distributed import as_completed, get_client
 from fiftyone import ViewField as F
 from skimage import exposure  # type: ignore
 from tqdm import tqdm
 from PIL import Image
+import xarray as xr
 import fiftyone as fo
 import tifffile
+import dask
 
 from cytomancer.experiment import Axes
 from cytomancer.config import config
