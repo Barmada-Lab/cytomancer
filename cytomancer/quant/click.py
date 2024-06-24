@@ -3,6 +3,7 @@ import joblib
 from pathlib import Path
 import click
 
+from distributed import LocalCluster, Client
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.experiment import ExperimentType
 from cytomancer.config import config
