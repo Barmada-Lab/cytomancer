@@ -3,6 +3,13 @@ from pathlib import Path
 import logging
 import uuid
 
+import dask
+from tqdm import tqdm
+import tifffile
+import fiftyone as fo
+from fiftyone import ViewField as F
+import xarray as xr
+from PIL import Image
 from distributed import as_completed, get_client
 from fiftyone import ViewField as F
 from skimage import exposure  # type: ignore
@@ -65,3 +72,45 @@ def ingest_cq1_longitudinal(experiment_path: Path):
     )
     dataset.save_view("T1 go / no-go", t1_view, color="orange")
     dataset.save()
+
+
+def xarr_coords_to_tags(xarr):
+    pass
+
+
+def tags_to_xarr_coords(tags):
+    pass
+
+
+def ingest_experiment(experiment: xr.DataArray):
+
+    experiment_name = experiment.attrs["experiment_name"]
+    cache_dir = config.fo_cache / experiment_name
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if fo.dataset_exists(experiment_name):
+        raise ValueError("Dataset already exists; delete before re-ingesting")
+
+    dataset = fo.Dataset(name=experiment_name)
+    dataset.persistent = True
+
+    @dask.delayed
+    def create_sample(frame):
+        png_path = cache_dir / f"{uuid.uuid4()}.png"
+        image = Image.fromarray(frame)
+        image.save(png_path, format="PNG")
+        tags = xarr_coords_to_tags(frame.coords)
+        sample = fo.Sample(filepath=png_path, tags=tags)
+        dataset.add_sample(sample)
+
+    chunked = experiment.chunk({
+        Axes.TIME: 1,
+        Axes.REGION: 1,
+        Axes.FIELD: 1,
+        Axes.CHANNEL: 1,
+    })
+
+    assert chunked.chunks is not None
+
+    for idx in chunked.chunks:
+        print(idx)

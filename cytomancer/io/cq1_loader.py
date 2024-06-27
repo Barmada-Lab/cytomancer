@@ -145,16 +145,18 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901
             })
 
     df = pd.DataFrame.from_records(records)
+    df = df[[Axes.TIME, Axes.CHANNEL, Axes.REGION, Axes.FIELD, Axes.Z, "path"]]  # explicitly order columns
     ts = df[Axes.TIME].unique().size
     acq_delta = acquisition_delta / ts
     df[Axes.TIME] = df[Axes.TIME].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
-    mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
 
-    return pd.DataFrame(
-        index=mi,
-        data=df[["path"]].values,
-        columns=["path"]
-    ).sort_index(), shape, attrs
+    preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
+    holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
+    holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index()
+    missing_data = holy_df.loc[holy_df["path"].isna()]
+    assert missing_data.size == 0, f"Missing acquisition data! {missing_data}."
+
+    return holy_df, shape, attrs
 
 
 def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
