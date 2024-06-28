@@ -1,7 +1,6 @@
 from pathlib import Path
-import os
+import shutil
 
-from tqdm import tqdm
 from dask.distributed import Client
 import fiftyone as fo
 import click
@@ -19,9 +18,8 @@ def launch_app() -> None:
 @click.argument("dataset_name")
 def delete_dataset(dataset_name: str) -> None:
     dataset = fo.load_dataset(dataset_name)
-    for sample in tqdm(dataset):
-        os.remove(sample.filepath)
-    dataset.delete()
+    shutil.rmtree(dataset.info["media_dir"])  # type: ignore
+    fo.delete_dataset(dataset_name)
 
 
 @click.command("ingest", help="Ingest a CQ1 dataset into FiftyOne. Other formats are not yet supported.")
