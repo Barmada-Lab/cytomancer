@@ -1,5 +1,6 @@
 from pathlib import Path
 import shutil
+import time
 
 from dask.distributed import Client
 import fiftyone as fo
@@ -12,6 +13,14 @@ from cytomancer.dask import dask_client
 @click.command("launch-app")
 def launch_app() -> None:
     fo.launch_app(address="0.0.0.0")  # type: ignore
+    while True:
+        try:
+            time.sleep(1)
+        except KeyboardInterrupt:
+            print("Shutting down fiftyone... please wait...")
+            fo.close_app()
+            print("Done.")
+            return
 
 
 @click.command("delete-dataset")
