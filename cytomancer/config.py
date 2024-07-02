@@ -32,6 +32,10 @@ class CytomancerConfig(BaseSettings):
     #  Url of celery broker; probably a redis instance
     celery_broker_url: str = "redis://localhost:6379"
 
+    dask_n_workers: int = 8
+
+    dask_threads_per_worker: int = 2
+
     @field_validator("models_dir", "collections_dir")
     @classmethod
     def exists(cls, path: Path):
