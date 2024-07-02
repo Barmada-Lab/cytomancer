@@ -25,7 +25,7 @@ def pultra_survival(experiment_dir: Path, classifier_name, save_annotations: boo
 
     if run_sync:
         from cytomancer.quant.pultra_survival import run
-        with LocalCluster(n_workers=8, threads_per_worker=3) as cluster, Client(cluster) as _:
+        with LocalCluster(n_workers=8, threads_per_worker=2) as cluster, Client(cluster) as _:
             run(experiment_dir, ExperimentType.CQ1, svm_path, save_annotations)
     else:
         from cytomancer.quant.tasks import run_pultra_survival
