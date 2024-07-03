@@ -64,5 +64,5 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
 
 def ingest_cq1(base_path: Path):
     dataset = get_or_create_dataset(base_path.name)
-    df, _, _ = cq1_loader.get_experiment_df(base_path)
+    df = cq1_loader.get_experiment_df(base_path)
     ingest_experiment_df(dataset, df)

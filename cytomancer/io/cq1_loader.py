@@ -153,13 +153,11 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
     holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
     holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index()
-    missing_data = holy_df.loc[holy_df["path"].isna()]
-    assert missing_data.size == 0, f"Missing acquisition data! {missing_data}."
 
     return holy_df, shape, attrs
 
 
-def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
+def get_experiment_df_detailed(base_path: pl.Path, ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
     """
     Indexes a CQ1 experiment directory by timepoint, channel, region, field, and z-slice.
 
@@ -218,6 +216,10 @@ def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> Tuple[p
 
         else:
             raise ValueError(f"Could not find any acquisition directories in {base_path}.")
+
+
+def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> pd.DataFrame:
+    return get_experiment_df_detailed(base_path, ordinal_time)[0]
 
 
 def load_df(df, shape, attrs) -> xr.DataArray:  # noqa: C901, get bent flake8
@@ -279,5 +281,5 @@ def load_cq1(base_path: pl.Path) -> xr.DataArray:
         The experiment data.
     """
 
-    df, shape, attrs = get_experiment_df(base_path)
+    df, shape, attrs = get_experiment_df_detailed(base_path)
     return load_df(df, shape, attrs)
