@@ -19,6 +19,7 @@ import click
 from cytomancer.ops import display
 from cytomancer.config import config
 from cytomancer.experiment import Axes, ExperimentType
+from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.utils import load_experiment
 from .helpers import coord_selector
 
@@ -178,15 +179,14 @@ def cli_entry_basic(
 
 @click.command("upload-experiment")
 @click.argument("project_name", type=str)
-@click.argument("experiment_base", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
+@experiment_dir_argument()
+@experiment_type_argument()
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to include. Defaults to all channels")
 @click.option("--regions", type=str, default="", help="comma-separated list of regions to include. Defaults to all regions")
 @click.option("--tps", type=str, default="", help="comma-separated list of timepoints to upload. Defaults to all timepoints")
 @click.option("--composite", is_flag=True, default=False, help="composite channels if set, else uploads each channel separately")
 @click.option("--mip", is_flag=True, default=False, help="apply MIP to each z-stack")
 @click.option("--dims", type=click.Choice(["XY", "TXY", "CXY", "ZXY"]), default="XY", help="dims of uploaded stacks")
-@click.option("--experiment-type", type=click.Choice(ExperimentType.__members__),  # type: ignore
-              callback=lambda c, p, v: getattr(ExperimentType, v) if v else None, help="experiment type")
 @click.option("--rescale", type=float, default=0.0,
               help="""rescales images by stretching the range of their values to be bounded
                 by the given percentile range, e.g. a value of 1 will rescale an image

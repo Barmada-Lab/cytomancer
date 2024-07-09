@@ -223,7 +223,7 @@ def measure_nuc_cyto_ratio(  # noqa: C901
 
 @click.command("nuc-cyto")
 @click.argument("project_name", type=str)
-@click.argument("experiment_base", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
+@click.argument("experiment_dir", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
 @click.argument("nuc_channel", type=str)
 @click.argument("soma_channel", type=str)
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to measure from; defaults to all")

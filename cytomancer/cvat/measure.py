@@ -8,6 +8,7 @@ import click
 
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from .upload import prep_experiment
 from .helpers import enumerate_rois
 
@@ -51,12 +52,11 @@ def measure_2d(
 
 @click.command("measure")
 @click.argument("project_name", type=str)
-@click.argument("experiment_base", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
+@experiment_dir_argument()
+@experiment_type_argument()
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to measure")
 @click.option("--mip", is_flag=True, default=False, help="apply MIP to each z-stack")
 @click.option("--dims", type=click.Choice(["XY", "TXY", "CXY", "ZXY"]), default="XY", help="dims of uploaded stacks")
-@click.option("--experiment-type", type=click.Choice(ExperimentType.__members__),  # type: ignore
-              callback=lambda c, p, v: getattr(ExperimentType, v) if v else None, help="experiment type")
 def cli_entry(
         project_name: str,
         experiment_base: pl.Path,
