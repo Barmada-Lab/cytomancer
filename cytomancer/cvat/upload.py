@@ -195,14 +195,14 @@ def cli_entry_basic(
 @click.option("--fillna", is_flag=True, default=False, help="interpolate missing images")
 def cli_entry_experiment(
         project_name: str,
-        experiment_base: pl.Path,
+        experiment_dir: pl.Path,
+        experiment_type: ExperimentType,
         channels: str,
         regions: str,
         tps: str,
         composite: bool,
         mip: bool,
         dims: str,
-        experiment_type: ExperimentType,
         rescale: float,
         samples_per_region: int,
         fillna: bool):
@@ -216,9 +216,9 @@ def cli_entry_experiment(
 
     if experiment_type == ExperimentType.ND2:
         logger.info("Loading ND2 files... this may take a while.")
-        collections = [prep_experiment(nd2_file, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna) for nd2_file in experiment_base.glob("**/*.nd2")]  # noqa: E501
+        collections = [prep_experiment(nd2_file, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna) for nd2_file in experiment_dir.glob("**/*.nd2")]  # noqa: E501
     else:
-        collections = [prep_experiment(experiment_base, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna)]  # noqa: E501
+        collections = [prep_experiment(experiment_dir, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna)]  # noqa: E501
 
     client = CvatClient(url=config.cvat_url)
     client.login((config.cvat_username, config.cvat_password))

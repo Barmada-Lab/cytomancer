@@ -59,22 +59,22 @@ def measure_2d(
 @click.option("--dims", type=click.Choice(["XY", "TXY", "CXY", "ZXY"]), default="XY", help="dims of uploaded stacks")
 def cli_entry(
         project_name: str,
-        experiment_base: pl.Path,
+        experiment_dir: pl.Path,
+        experiment_type: ExperimentType,
         channels: str,
         mip: bool,
-        dims: str,
-        experiment_type: ExperimentType):
+        dims: str):
 
     channel_list = channels.split(",")
     if channel_list == [""]:
         raise ValueError("Must provide at least one channel to measure")
 
     if experiment_type == "nd2s":
-        collections = {nd2_file.name: prep_experiment(nd2_file, mip, False, experiment_type, 0.0, None, False) for nd2_file in experiment_base.glob("**/*.nd2")}
+        collections = {nd2_file.name: prep_experiment(nd2_file, mip, False, experiment_type, 0.0, None, False) for nd2_file in experiment_dir.glob("**/*.nd2")}
     else:
-        collections = {experiment_base.name: prep_experiment(experiment_base, mip, False, experiment_type, rescale=0.0, channels=None, apply_psuedocolor=False, to_uint8=False, fillna=False)}
+        collections = {experiment_dir.name: prep_experiment(experiment_dir, mip, False, experiment_type, rescale=0.0, channels=None, apply_psuedocolor=False, to_uint8=False, fillna=False)}
 
-    output_dir = experiment_base / "results"
+    output_dir = experiment_dir / "results"
     output_dir.mkdir(exist_ok=True)
 
     client = Client(url=config.cvat_url, config=Config(verify_ssl=False))

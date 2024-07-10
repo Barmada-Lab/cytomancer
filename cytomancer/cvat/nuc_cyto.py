@@ -10,6 +10,7 @@ import click
 
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from .upload import prep_experiment
 from .helpers import enumerate_rois
 
@@ -223,21 +224,21 @@ def measure_nuc_cyto_ratio(  # noqa: C901
 
 @click.command("nuc-cyto")
 @click.argument("project_name", type=str)
-@click.argument("experiment_dir", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
+@experiment_dir_argument()
+@experiment_type_argument()
 @click.argument("nuc_channel", type=str)
 @click.argument("soma_channel", type=str)
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to measure from; defaults to all")
 @click.option("--mip", is_flag=True, default=False, help="apply MIP to each z-stack")
-@click.option("--experiment-type", type=click.Choice(ExperimentType.__members__),  # type: ignore
-              callback=lambda c, p, v: getattr(ExperimentType, v) if v else None, help="experiment type")
 def cli_entry(
         project_name: str,
-        experiment_base: pl.Path,
+        experiment_dir: pl.Path,
+        experiment_type: ExperimentType,
         nuc_channel: str,
         soma_channel: str,
         channels: str,
         mip: bool,
-        experiment_type: ExperimentType):
+        ):
 
     client = Client(url=config.cvat_url, config=Config(verify_ssl=False))
     client.login((config.cvat_username, config.cvat_password))
@@ -261,13 +262,13 @@ def cli_entry(
         channel_list = channels.split(",")
 
     project_id = project.id
-    output_dir = experiment_base / "results"
+    output_dir = experiment_dir / "results"
     output_dir.mkdir(exist_ok=True)
 
     # TODO: homogenize collections and put into one array
     if experiment_type is ExperimentType.ND2:
         df = pd.DataFrame()
-        for nd2_file in tqdm(experiment_base.glob("**/*.nd2")):
+        for nd2_file in tqdm(experiment_dir.glob("**/*.nd2")):
             collection_name = nd2_file.name.replace(".nd2", "")
             intensity_arr = prep_experiment(nd2_file, mip, False, experiment_type, 0.0, None, False, False, False)
             print(intensity_arr)
@@ -276,6 +277,6 @@ def cli_entry(
             intensity_arr.close()
         df.to_csv(output_dir / "nuc_cyto_CVAT.csv", index=False)
     else:
-        collections = prep_experiment(experiment_base, mip, False, experiment_type, 0.0, None, False, False, False)
+        collections = prep_experiment(experiment_dir, mip, False, experiment_type, 0.0, None, False, False, False)
         df = measure_nuc_cyto_ratio(client, project_id, collections, nuc_channel, soma_channel, channel_list)
         df.to_csv(output_dir / "nuc_cyto_CVAT.csv", index=False)
