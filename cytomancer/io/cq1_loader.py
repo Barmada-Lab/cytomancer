@@ -152,7 +152,7 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
     holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
-    holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index()
+    holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index().replace({np.nan: None})
 
     return holy_df, shape, attrs
 
@@ -222,11 +222,17 @@ def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> pd.Data
     return get_experiment_df_detailed(base_path, ordinal_time)[0]
 
 
-def load_df(df, shape, attrs) -> xr.DataArray:  # noqa: C901, get bent flake8
+def load_df(df, shape, attrs) -> xr.DataArray:
 
     def read_img(path):
         logger.debug(f"Reading {path}")
-        return tifffile.imread(path)
+        if path is None:
+            logger.warning("MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs...")
+            return np.full(shape, np.nan)
+        elif not path.exists():
+            logger.warning(f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs...")
+            return np.full(shape, np.nan)
+        return tifffile.imread(path).astype(np.float16)
 
     def read_indexed_ims(recurrence):
         """
@@ -235,7 +241,7 @@ def load_df(df, shape, attrs) -> xr.DataArray:  # noqa: C901, get bent flake8
         """
         if type(recurrence) is pd.Series:
             path = recurrence["path"]
-            return da.from_delayed(dask.delayed(read_img)(path), shape, dtype=np.uint16)
+            return da.from_delayed(dask.delayed(read_img)(path), shape, dtype=np.float16)
         else:  # type(recurrence) is pd.DataFrame
             if type(recurrence.index) is pd.MultiIndex:
                 level = recurrence.index.levels[0]  # type: ignore
@@ -250,7 +256,7 @@ def load_df(df, shape, attrs) -> xr.DataArray:  # noqa: C901, get bent flake8
         arr,
         dims=labels + [Axes.Y, Axes.X],
         coords=dict((label, val) for label, val in zip(labels, df.index.levels)),  # type: ignore
-        attrs=attrs)
+        attrs=attrs).isel({Axes.Y: slice(0, 1998), Axes.X: slice(0, 1998)})
 
     # The above method will produce coordinates of dtype object, which
     # causes issues downstream as it's inconsistent with other experiment loaders. '

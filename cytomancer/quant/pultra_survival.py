@@ -7,8 +7,8 @@ from skimage.measure import regionprops
 from skimage.exposure import rescale_intensity
 from skimage import filters, exposure, morphology  # type: ignore
 from dask.distributed import Worker, get_client
-import fiftyone as fo
 from fiftyone import ViewField as F
+import fiftyone as fo
 import xarray as xr
 import pandas as pd
 import numpy as np
@@ -45,7 +45,7 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
     gfp_field_med = np.median(gfp)
     rfp_field_med = np.median(rfp)
 
-    preds = np.zeros_like(nuc_labels)
+    preds = np.zeros_like(nuc_labels, dtype=np.uint8)
     for props in regionprops(nuc_labels):
         mask = nuc_labels == props.label
         dapi_mean = dapi[mask].mean()
@@ -64,86 +64,59 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
     return preds
 
 
-def quantify(intensity: xr.DataArray, seg_model, classifier: Pipeline, dataset: fo.Dataset | None = None):
+def process(intensity: xr.DataArray, seg_model, classifier: Pipeline):
 
-    def quantify_field(field: xr.DataArray):
+    def process_field(dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray):
 
-        dapi = field.sel({Axes.CHANNEL: "DAPI"}).squeeze(drop=True).values
-        gfp = field.sel({Axes.CHANNEL: "GFP"}).squeeze(drop=True).values
-        rfp = field.sel({Axes.CHANNEL: "RFP"}).squeeze(drop=True).values
+        if np.isnan(dapi).any() or np.isnan(gfp).any() or np.isnan(rfp).any():
+            return (
+                np.full_like(dapi, np.iinfo(np.uint16).max, dtype=np.uint16),
+                np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
+            )
 
         footprint = morphology.disk(5)
-        dapi_eqd = np.array([
-            exposure.equalize_adapthist(
-                filters.rank.median(
-                    rescale_intensity(
-                        frame,
-                        out_range="uint8"),
-                    footprint),
-                kernel_size=100,
-                clip_limit=0.01) for frame in dapi])
-        nuc_labels = np.array([seg_model.predict_instances(frame)[0] for frame in dapi_eqd]).astype(np.uint16)  # type: ignore
 
-        preds = np.array([predict(dapi_frame, gfp_frame, rfp_frame, nuc_label_frame, classifier) for dapi_frame, gfp_frame, rfp_frame, nuc_label_frame in zip(dapi, gfp, rfp, nuc_labels)]).astype(np.uint8)
+        rescaled = rescale_intensity(dapi, out_range="uint8")
+        med = filters.rank.median(rescaled, footprint)
+        eqd = exposure.equalize_adapthist(med, kernel_size=100, clip_limit=0.01)
+        nuc_labels = seg_model.predict_instances(eqd)[0].astype(np.uint16)  # type: ignore
+        preds = predict(dapi, gfp, rfp, nuc_labels, classifier)
 
-        counts = []
-        for idx, (label_frame, pred_frame) in enumerate(zip(nuc_labels, preds)):
+        return nuc_labels, preds
 
-            count = 0
-            detections = []
-            for props in regionprops(label_frame):
-                mask = label_frame == props.label
+    nuc_labels, preds = xr.apply_ufunc(
+        process_field,
+        intensity.sel({Axes.CHANNEL: "DAPI"}).drop_vars(Axes.CHANNEL),
+        intensity.sel({Axes.CHANNEL: "GFP"}).drop_vars(Axes.CHANNEL),
+        intensity.sel({Axes.CHANNEL: "RFP"}).drop_vars(Axes.CHANNEL),
+        input_core_dims=[[Axes.Y, Axes.X], [Axes.Y, Axes.X], [Axes.Y, Axes.X]],
+        output_core_dims=[[Axes.Y, Axes.X], [Axes.Y, Axes.X]],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[np.uint16, np.uint8])
 
-                prediction = np.argmax(np.bincount(pred_frame[mask]))
-                if prediction == LIVE:
-                    label = "live"
-                    count += 1
-                elif prediction == DEAD:
-                    label = "dead"
-                else:  # censored
-                    continue
-
-                if dataset is not None:
-                    detections.append(
-                        fo.Detection.from_mask(mask, label=label))
-
-            if dataset is not None:
-                time = idx
-                region_id = str(field.squeeze()[Axes.REGION].values)
-                field_id = str(field.squeeze()[Axes.FIELD].values)
-                logger.info(f"Processing time {time}, region {region_id}, field {field_id}: {count} live cells detected")
-                dapi_sample = (
-                    dataset
-                    .filter_field(Axes.TIME.name, F() == time)
-                    .filter_field(Axes.REGION.name, F() == region_id)
-                    .filter_field(Axes.FIELD.name, F() == field_id)
-                    .filter_field(Axes.CHANNEL.name, F() == "DAPI")
-                    .first())
-                dapi_sample["predictions"] = fo.Detections(detections=detections)
-                dapi_sample.save()
-
-            counts.append(count)
-
-        return xr.DataArray(
-            data=np.array(counts).reshape(-1, 1, 1),
-            dims=[Axes.TIME, Axes.REGION, Axes.FIELD],
-            coords={Axes.TIME: field[Axes.TIME], Axes.REGION: field[Axes.REGION], Axes.FIELD: field[Axes.FIELD]})
-
-    chunked = intensity.chunk({
-        Axes.TIME: -1,
-        Axes.CHANNEL: -1,
-        Axes.REGION: 1,
-        Axes.FIELD: 1
+    return xr.Dataset({
+        "nuc_labels": nuc_labels,
+        "preds": preds
     })
 
-    # final result is cellcount as a fuction of time, region, and field
-    template = chunked.isel({
-        Axes.CHANNEL: 0,
-        Axes.X: 0,
-        Axes.Y: 0
-    }).drop_vars(Axes.CHANNEL).squeeze(drop=True)
 
-    return xr.map_blocks(quantify_field, chunked, template=template)
+def quantify(results: xr.Dataset):
+
+    def quantify_field(nuc_labels, preds):
+        if (nuc_labels == np.iinfo(np.uint16).max).all():
+            return np.asarray([np.nan])
+        return np.asarray([np.unique(nuc_labels[np.where(preds == LIVE)]).shape[0]], dtype=float)
+
+    return xr.apply_ufunc(
+        quantify_field,
+        results["nuc_labels"],
+        results["preds"],
+        input_core_dims=[["y", "x"], ["y", "x"]],
+        output_core_dims=[["count"]],
+        dask_gufunc_kwargs={"output_sizes": {"count": 1}},
+        vectorize=True,
+        dask="parallelized").squeeze("count", drop=True)
 
 
 def run(
@@ -164,7 +137,6 @@ def run(
         # faster to run many CPU workers in parallel
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
         logging.basicConfig(level=config.log_level, format=fmt)
         logging.getLogger("dask").setLevel(level=logging.WARN)
         logging.getLogger("distributed.nanny").setLevel(level=logging.WARN)
@@ -172,7 +144,8 @@ def run(
         logging.getLogger("distributed.core").setLevel(level=logging.WARN)
         logging.getLogger("distributed.http").setLevel(level=logging.WARN)
         import tensorflow as tf
-        tf.config.threading.set_intra_op_parallelism_threads(3)
+        tf.config.threading.set_intra_op_parallelism_threads(2)
+        tf.get_logger().setLevel('ERROR')
 
     client.register_worker_callbacks(init_logging)
 
@@ -181,11 +154,6 @@ def run(
         raise ValueError(f"Could not load classifier model at path {svm_model_path}")
 
     intensity = load_experiment(experiment_path, experiment_type)
-
-    if experiment_type is ExperimentType.CQ1:
-        # The last row/col of DAPI images captured on the CQ1 is inexplicably zeroed out.
-        # We slice it out to avoid issues further down the line
-        intensity = intensity.isel({Axes.X: slice(0, 1998), Axes.Y: slice(0, 1998)})
 
     results_dir = experiment_path / "results"
     results_dir.mkdir(exist_ok=True, parents=True)
@@ -197,23 +165,24 @@ def run(
         logger.warn(f"Could not find dataset for {experiment_path.name}; did you run fiftyone ingest on your experiment? Annotations will not be saved.")
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
     import tensorflow as tf
-    tf.config.threading.set_intra_op_parallelism_threads(3)
+    tf.config.threading.set_intra_op_parallelism_threads(2)
+    tf.get_logger().setLevel('ERROR')
     from stardist.models import StarDist2D
     model = StarDist2D.from_pretrained("2D_versatile_fluo")
 
     assert model is not None, "Could not load stardist model"
 
-    (
-        quantify(intensity, model, classifier, dataset)
-        .rename({
-            Axes.TIME: "time",
-            Axes.REGION: "well",
-            Axes.FIELD: "field"
-        })
-        .to_dataframe("count")
-        .to_csv(results_dir / "survival.csv", index=False)
+    intensity = intensity.sel({Axes.REGION: ["C04"]})
+    store_path = results_dir / "survival_processed.zarr"
+    process(intensity, model, classifier).to_zarr(store_path, mode="w")
+
+    df = (
+        quantify(xr.open_zarr(store_path))
+        .to_dataframe(name="count", dim_order=["region", "field", "time"])
+        .dropna()
     )
+    df["count"] = df["count"].astype(int)
+    df.to_csv(results_dir / "survival.csv")
 
     logger.info(f"Finished analysis of {experiment_path}")

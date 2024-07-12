@@ -3,7 +3,6 @@ import joblib
 from pathlib import Path
 import click
 
-from dask.distributed import LocalCluster, Client
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.experiment import ExperimentType
 from cytomancer.config import config
@@ -26,8 +25,8 @@ def pultra_survival(experiment_dir: Path, classifier_name, save_annotations: boo
 
     if run_sync:
         from cytomancer.quant.pultra_survival import run
-        with dask_client() as _:
-            run(experiment_dir, ExperimentType.CQ1, svm_path, save_annotations)
+        with dask_client():
+            run(experiment_dir, ExperimentType.CQ1, svm_path)
     else:
         from cytomancer.quant.tasks import run_pultra_survival
         run_pultra_survival.delay(str(experiment_dir), ExperimentType.CQ1, str(svm_path), save_annotations)
