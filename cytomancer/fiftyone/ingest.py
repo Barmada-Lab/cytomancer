@@ -33,7 +33,7 @@ def get_or_create_dataset(name: str) -> fo.Dataset:
 def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
 
     client = get_client()
-    axes = df.index.names
+    axes = [axis.value for axis in df.index.names]  # type: ignore
     media_dir = Path(dataset.info["media_dir"])  # type: ignore
 
     @dask.delayed
@@ -41,6 +41,11 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
         coords, row = coord_row
         path = row["path"]
         tags_dict = dict(zip(axes, coords))
+
+        tags_dict["region_field_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"]]))
+        tags_dict["time_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"], tags_dict["channel"]]))
+        tags_dict["channel_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"], tags_dict["time"]]))
+        tags_dict["z_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["time"], tags_dict["channel"]]))
 
         arr = tifffile.imread(path)
         rescaled = exposure.rescale_intensity(arr, out_range="uint8")
@@ -56,8 +61,16 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
         sample = fo.Sample(filepath=png_path)
         sample["raw_path"] = str(raw_path)  # attach the rawpath for quantitative stuff
         for key, value in tags.items():
-            sample[key.name] = value
+            sample[key] = value
         dataset.add_sample(sample)
+
+    timeseries_view = dataset.group_by("time_stack_key", order_by="time")
+    channel_stack_view = dataset.group_by("channel_stack_key", order_by="channel")
+    z_stack_view = dataset.group_by("z_stack_key", order_by="z")
+
+    dataset.save_view("timeseries", timeseries_view)
+    dataset.save_view("channel_stacks", channel_stack_view)
+    dataset.save_view("z_stacks", z_stack_view)
 
     dataset.save()
 
