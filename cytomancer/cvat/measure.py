@@ -7,7 +7,7 @@ import xarray as xr
 import click
 
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.experiment import ExperimentType
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from .upload import prep_experiment
 from .helpers import enumerate_rois
@@ -29,8 +29,8 @@ def measure_2d(
             for props in regionprops(rois):
                 field_measurements.append({
                     "id": props.label,
-                    "region": selector[Axes.REGION],
-                    "field": selector[Axes.FIELD],
+                    "region": selector["region"],
+                    "field": selector["field"],
                     "area": props.area,
                 })
             field_df = pd.DataFrame.from_records(field_measurements)

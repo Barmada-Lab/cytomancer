@@ -3,7 +3,6 @@ import pathlib as pl
 import dask.array as da
 import xarray as xr
 
-from cytomancer.experiment import Axes
 from . import ioutils
 
 
@@ -46,16 +45,16 @@ def load_lux(base: pl.Path, fillna: bool = True) -> xr.DataArray:
 
     intensity = xr.DataArray(
         plate,
-        dims=[Axes.CHANNEL, Axes.TIME, Axes.REGION, Axes.FIELD, Axes.Y, Axes.X],
+        dims=["channel", "time", "region", "field", "y", "x"],
         coords={
-            Axes.CHANNEL: channel_coords,
-            Axes.TIME: timepoint_tags,
-            Axes.REGION: region_coords,
-            Axes.FIELD: field_coords,
+            "channel": channel_coords,
+            "time": timepoint_tags,
+            "region": region_coords,
+            "field": field_coords,
         }
     )
 
     if fillna:
-        intensity = intensity.ffill(Axes.TIME).bfill(Axes.TIME).ffill(Axes.FIELD).bfill(Axes.FIELD)
+        intensity = intensity.ffill("time").bfill("time").ffill("field").bfill("field")
 
     return intensity

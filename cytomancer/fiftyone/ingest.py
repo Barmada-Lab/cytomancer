@@ -33,7 +33,7 @@ def get_or_create_dataset(name: str) -> fo.Dataset:
 def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
 
     client = get_client()
-    axes = [axis.value for axis in df.index.names]  # type: ignore
+    axes = df.index.names  # type: ignore
     media_dir = Path(dataset.info["media_dir"])  # type: ignore
 
     @dask.delayed

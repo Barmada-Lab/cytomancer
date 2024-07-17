@@ -4,14 +4,12 @@ from skimage import transform
 import xarray as xr
 import nd2
 
-from cytomancer.experiment import Axes
-
 
 def load_nd2(path: pl.Path) -> xr.DataArray:
 
     arr = nd2.imread(path, xarray=True)
     nd2_label = path.name.replace(".nd2", "")
-    arr = arr.expand_dims(Axes.REGION).assign_coords({Axes.REGION: [nd2_label]})
+    arr = arr.expand_dims("region").assign_coords({"region": [nd2_label]})
 
     # single-channel images don't include C
     if "C" not in arr.dims:
@@ -31,15 +29,15 @@ def load_nd2(path: pl.Path) -> xr.DataArray:
 
     arr = arr.assign_coords(P=point_coords)
     rename_dict = dict(
-        C=Axes.CHANNEL,
-        P=Axes.FIELD,
-        Y=Axes.Y,
-        X=Axes.X,)
+        C="channel",
+        P="field",
+        Y="y",
+        X="x",)
 
     if "T" in arr.dims:
-        rename_dict["T"] = Axes.TIME
+        rename_dict["T"] = "time"
     if "Z" in arr.dims:
-        rename_dict["Z"] = Axes.Z
+        rename_dict["Z"] = "z"
     arr = arr.rename(rename_dict)
 
     return arr
@@ -56,31 +54,31 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
         nd2 = load_nd2(path)
         arrs.append(nd2)
 
-    assert len(set(arr.sizes[Axes.CHANNEL] for arr in arrs)) == 1, "Number of channels must be the same across all images"
+    assert len(set(arr.sizes["channel"] for arr in arrs)) == 1, "Number of channels must be the same across all images"
 
-    aspect_ratios = [nd2.sizes[Axes.Y] / nd2.sizes[Axes.X] for nd2 in arrs]
+    aspect_ratios = [nd2.sizes["y"] / nd2.sizes["x"] for nd2 in arrs]
     assert len(set(aspect_ratios)) == 1, "Aspect ratios must be the same across all images"
 
-    max_x = max(nd2.sizes[Axes.X] for nd2 in arrs)
-    max_y = max(nd2.sizes[Axes.Y] for nd2 in arrs)
+    max_x = max(nd2.sizes["x"] for nd2 in arrs)
+    max_y = max(nd2.sizes["y"] for nd2 in arrs)
 
     homogenized = []
     for arr in arrs:
 
-        if nd2.sizes[Axes.Y] == max_y and nd2.sizes[Axes.X] == max_x:
+        if nd2.sizes["y"] == max_y and nd2.sizes["x"] == max_x:
             homogenized.append(arr)
             continue
 
         resized = xr.apply_ufunc(
             transform.resize,
             arr,
-            input_core_dims=[[Axes.Y, Axes.X]],
-            output_core_dims=[[Axes.Y, Axes.X]],
+            input_core_dims=[["y", "x"]],
+            output_core_dims=[["y", "x"]],
             dask="parallelized",
             vectorize=True,
-            dask_gufunc_kwargs={"output_sizes": {Axes.Y: max_y, Axes.X: max_x}},
+            dask_gufunc_kwargs={"output_sizes": {"y": max_y, "x": max_x}},
             kwargs=dict(output_shape=(max_y, max_x)))
 
         homogenized.append(resized)
 
-    return xr.concat(homogenized, dim=Axes.REGION).assign_coords({Axes.REGION: regions})
+    return xr.concat(homogenized, dim="region").assign_coords({"region": regions})

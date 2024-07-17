@@ -4,10 +4,8 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 
-from cytomancer.experiment import Axes
 
-
-def rescale_intensity(arr: xr.DataArray, dims: list[Axes], **kwargs):
+def rescale_intensity(arr: xr.DataArray, dims: list[str], **kwargs):
 
     def _rescale_intensity(frame, in_percentile: tuple[int, int] | None = None, **kwargs):
         if in_percentile is not None:
@@ -40,8 +38,8 @@ def clahe(arr: xr.DataArray):
     return xr.apply_ufunc(
         _clahe,
         arr,
-        input_core_dims=[[Axes.Y, Axes.X]],
-        output_core_dims=[[Axes.Y, Axes.X]],
+        input_core_dims=[["y", "x"]],
+        output_core_dims=[["y", "x"]],
         vectorize=True,
         dask="parallelized")
 
@@ -83,29 +81,29 @@ def apply_psuedocolor(arr: xr.DataArray):
     rgb = xr.apply_ufunc(
         _rgb,
         arr,
-        arr[Axes.CHANNEL],
-        input_core_dims=[[Axes.Y, Axes.X], []],
-        output_core_dims=[[Axes.Y, Axes.X, Axes.RGB]],
-        dask_gufunc_kwargs=dict(output_sizes={Axes.RGB: 3}),
+        arr["channel"],
+        input_core_dims=[["y", "x"], []],
+        output_core_dims=[["y", "x", "rgb"]],
+        dask_gufunc_kwargs=dict(output_sizes={"rgb": 3}),
         output_dtypes=[np.uint8],
         vectorize=True,
         dask="parallelized")
 
-    return rgb.transpose(..., Axes.RGB)
+    return rgb.transpose(..., "rgb")
 
 
 def stitch(arr: xr.DataArray, trim: float = 0.05):
     # TODO: arrange tiles correctly
-    trimmed = arr.sel({
-        Axes.Y: slice(int(arr[Axes.Y].size * trim), int(arr[Axes.Y].size * (1 - trim))),
-        Axes.X: slice(int(arr[Axes.X].size * trim), int(arr[Axes.X].size * (1 - trim)))
-    })
-    field_dim = np.sqrt(arr[Axes.FIELD].size).astype(int)
+    trimmed = arr.sel(
+        y=slice(int(arr["y"].size * trim), int(arr["y"].size * (1 - trim))),
+        x=slice(int(arr["x"].size * trim), int(arr["x"].size * (1 - trim)))
+    )
+    field_dim = np.sqrt(arr["field"].size).astype(int)
     mi = pd.MultiIndex.from_product(
         (range(field_dim), range(field_dim)), names=["fx", "fy"])
-    mindex_coords = xr.Coordinates.from_pandas_multiindex(mi, Axes.FIELD)
-    trimmed = trimmed.assign_coords(mindex_coords).unstack(Axes.FIELD)
+    mindex_coords = xr.Coordinates.from_pandas_multiindex(mi, "field")
+    trimmed = trimmed.assign_coords(mindex_coords).unstack("field")
 
-    x_stitched = xr.concat(trimmed.transpose("fx", ..., Axes.Y, Axes.X)[::-1], dim=Axes.Y)
-    stitched = xr.concat(x_stitched.transpose("fy", ..., Axes.X, Axes.Y)[::-1], dim=Axes.X)
+    x_stitched = xr.concat(trimmed.transpose("fx", ..., "y", "x")[::-1], dim="y")
+    stitched = xr.concat(x_stitched.transpose("fy", ..., "x", "y")[::-1], dim="x")
     return stitched.drop(["fx", "fy"])

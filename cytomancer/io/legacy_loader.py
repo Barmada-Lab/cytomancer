@@ -5,7 +5,6 @@ import dask.array as da
 import xarray as xr
 import numpy as np
 
-from cytomancer.experiment import Axes
 from . import ioutils
 
 
@@ -50,17 +49,17 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
 
     intensity = xr.DataArray(
         plate,
-        dims=[Axes.CHANNEL, Axes.TIME, Axes.REGION, Axes.FIELD, Axes.Y, Axes.X],
+        dims=["channel", "time", "region", "field", "y", "x"],
         coords={
-            Axes.CHANNEL: channel_tags,
-            Axes.TIME: timepoint_tags,
-            Axes.REGION: region_tags,
-            Axes.FIELD: field_tags,
+            "channel": channel_tags,
+            "time": timepoint_tags,
+            "region": region_tags,
+            "field": field_tags,
         }
     )
 
     if fillna:
-        intensity = intensity.ffill(Axes.TIME).bfill(Axes.TIME).ffill(Axes.FIELD).bfill(Axes.FIELD)
+        intensity = intensity.ffill("time").bfill("time").ffill("field").bfill("field")
 
     return intensity
 
@@ -106,16 +105,16 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
 
     intensity = xr.DataArray(
         plate,
-        dims=[Axes.CHANNEL, Axes.REGION, Axes.TIME, Axes.FIELD, Axes.Y, Axes.X],
+        dims=["channel", "region", "time", "field", "y", "x"],
         coords={
-            Axes.CHANNEL: channel_tags,
-            Axes.TIME: [0],
-            Axes.REGION: list(map(str, timepoint_tags)),
-            Axes.FIELD: field_tags,
+            "channel": channel_tags,
+            "time": [0],
+            "region": list(map(str, timepoint_tags)),
+            "field": field_tags,
         }
-    ).squeeze(Axes.TIME, drop=True)
+    ).squeeze("time", drop=True)
 
     if fillna:
-        intensity = intensity.ffill(Axes.TIME).bfill(Axes.TIME).ffill(Axes.FIELD).bfill(Axes.FIELD)
+        intensity = intensity.ffill("time").bfill("time").ffill("field").bfill("field")
 
     return intensity

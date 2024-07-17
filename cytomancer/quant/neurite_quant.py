@@ -7,14 +7,14 @@ from sklearn.pipeline import Pipeline
 import xarray as xr
 import numpy as np
 
-from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.experiment import ExperimentType
 from cytomancer.oneoffs import ilastish_seg_model
 from cytomancer.utils import load_experiment
 
 
 def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):
 
-    gfp = experiment.sel({Axes.CHANNEL: "GFP"})
+    gfp = experiment.sel(channel="GFP")
 
     def segment_and_skeletonize(field):
         segmented = ilastish_seg_model.predict(field, model) == ilastish_seg_model.FOREGROUND
@@ -29,12 +29,12 @@ def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):
     return xr.apply_ufunc(
         segment_and_skeletonize,
         gfp,
-        input_core_dims=[[Axes.Y, Axes.X]],
-        output_core_dims=[[Axes.Y, Axes.X]],
+        input_core_dims=[["y", "x"]],
+        output_core_dims=[["y", "x"]],
         dask="parallelized",
         vectorize=True,
         output_dtypes=[bool]
-    ).drop_vars(Axes.CHANNEL)
+    ).drop_vars("channel")
 
 
 def run(
@@ -47,7 +47,7 @@ def run(
 
     skeletons = neurite_skeleseg(experiment, model)
 
-    neurite_length = skeletons.sum(dim=[Axes.Y, Axes.X])
+    neurite_length = skeletons.sum(dim=["y", "x"])
 
     results_dir = experiment_path / "results"
     results_dir.mkdir(exist_ok=True)

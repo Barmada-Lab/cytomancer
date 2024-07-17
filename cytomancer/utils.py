@@ -7,7 +7,7 @@ from cytomancer.io.legacy_loader import load_legacy, load_legacy_icc
 from cytomancer.io.nd2_loader import load_nd2
 from cytomancer.io.lux_loader import load_lux
 from cytomancer.io.cq1_loader import load_cq1
-from cytomancer.experiment import Axes, ExperimentType
+from cytomancer.experiment import ExperimentType
 
 
 def load_experiment(path: pl.Path, experiment_type: ExperimentType, fillna: bool = False) -> xr.DataArray:
@@ -32,8 +32,8 @@ def apply_ufunc_xy(
     return xr.apply_ufunc(
         func,
         arr,
-        input_core_dims=[[Axes.Y, Axes.X]],
-        output_core_dims=[[Axes.Y, Axes.X]],
+        input_core_dims=[["y", "x"]],
+        output_core_dims=[["y", "x"]],
         dask="parallelized",
         vectorize=True,
         kwargs=ufunc_kwargs,
@@ -92,5 +92,3 @@ def get_user_confirmation(prompt, default=None):
 
         # If response is invalid, notify the user and prompt again
         print("Please respond with 'y' or 'n' (or 'yes' or 'no').")
-
-

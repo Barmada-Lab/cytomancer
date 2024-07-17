@@ -15,7 +15,6 @@ import xarray as xr
 import numpy as np
 import re
 
-from cytomancer.experiment import Axes
 
 logger = logging.getLogger(__name__)
 
@@ -136,19 +135,19 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901
             image_path = data.uuid.file_name
             assert image_path is not None, f"Data block {data.id} has no file name."
             records.append({
-                Axes.TIME: t,
-                Axes.CHANNEL: c,
-                Axes.REGION: well_label,
-                Axes.FIELD: field_idx_label,
-                Axes.Z: z,
+                "time": t,
+                "channel": c,
+                "region": well_label,
+                "field": field_idx_label,
+                "z": z,
                 "path": path / image_path,
             })
 
     df = pd.DataFrame.from_records(records)
-    df = df[[Axes.TIME, Axes.CHANNEL, Axes.REGION, Axes.FIELD, Axes.Z, "path"]]  # explicitly order columns
-    ts = df[Axes.TIME].unique().size
+    df = df[["time", "channel", "region", "field", "z", "path"]]  # explicitly order columns
+    ts = df["time"].unique().size
     acq_delta = acquisition_delta / ts
-    df[Axes.TIME] = df[Axes.TIME].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
+    df["time"] = df["time"].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
     holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
@@ -178,7 +177,7 @@ def get_experiment_df_detailed(base_path: pl.Path, ordinal_time: bool = False) -
 
     def reindex_time(df, value):
         multiindex = df.index
-        time_index = multiindex.names.index(Axes.TIME)
+        time_index = multiindex.names.index("time")
         new_index = multiindex.set_levels(
             multiindex.levels[time_index].map(lambda _: value),
             level=time_index
@@ -251,23 +250,23 @@ def load_df(df, shape, attrs) -> xr.DataArray:
 
     arr = read_indexed_ims(df)
 
-    labels = [Axes.TIME, Axes.CHANNEL, Axes.REGION, Axes.FIELD, Axes.Z]
+    labels = ["time", "channel", "region", "field", "z"]
     arr = xr.DataArray(
         arr,
-        dims=labels + [Axes.Y, Axes.X],
+        dims=labels + ["y", "x"],
         coords=dict((label, val) for label, val in zip(labels, df.index.levels)),  # type: ignore
-        attrs=attrs).isel({Axes.Y: slice(0, 1998), Axes.X: slice(0, 1998)})
+        attrs=attrs).isel({"y": slice(0, 1998), "x": slice(0, 1998)})
 
     # The above method will produce coordinates of dtype object, which
     # causes issues downstream as it's inconsistent with other experiment loaders. '
     # So we explicitly cast them to strings here /shrug
-    arr.coords[Axes.CHANNEL] = arr.coords[Axes.CHANNEL].astype(str)
-    arr.coords[Axes.REGION] = arr.coords[Axes.REGION].astype(str)
-    arr.coords[Axes.FIELD] = arr.coords[Axes.FIELD].astype(str)
+    arr.coords["channel"] = arr.coords["channel"].astype(str)
+    arr.coords["region"] = arr.coords["region"].astype(str)
+    arr.coords["field"] = arr.coords["field"].astype(str)
 
     # Squeeze out Z if we're dealing with MIPs
-    if Axes.Z in arr.dims:
-        arr = arr.squeeze(Axes.Z, drop=True)
+    if "z" in arr.dims:
+        arr = arr.squeeze("z", drop=True)
     return arr
 
 

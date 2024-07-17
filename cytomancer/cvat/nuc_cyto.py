@@ -9,7 +9,7 @@ import xarray as xr
 import click
 
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.experiment import ExperimentType
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from .upload import prep_experiment
 from .helpers import enumerate_rois
@@ -38,18 +38,18 @@ def measure_nuc_cyto_ratio_nd2s(  # noqa: C901
         measurement_channels: list[str] | None = None):
 
     if measurement_channels is None:
-        measurement_channels = intensity_arr[Axes.CHANNEL].values.tolist()
+        measurement_channels = intensity_arr["channel"].values.tolist()
 
     df = pd.DataFrame()
     for selector, obj_arr, _ in enumerate_rois(client, project_id):
 
-        region = selector.pop(Axes.REGION)
+        region = selector.pop("region")
         if region != collection_name:
             continue
 
         intensity_arr = intensity_arr.sel(selector)
 
-        channels = selector[Axes.CHANNEL]
+        channels = selector["channel"]
         nuc_idx = np.where(channels == nuc_channel)
         soma_idx = np.where(channels == soma_channel)
 
@@ -88,10 +88,10 @@ def measure_nuc_cyto_ratio_nd2s(  # noqa: C901
 
             print(f"Measuring {channel}")
             # sometimes these collections are inhomogenous and don't contain all the channels we're interested in
-            if channel not in intensity_arr[Axes.CHANNEL].values:
+            if channel not in intensity_arr["channel"].values:
                 continue
 
-            field_intensity_arr = intensity_arr.sel({Axes.CHANNEL: channel}).values
+            field_intensity_arr = intensity_arr.sel(channel=channel).values
 
             # measure soma
             for props in regionprops(soma_mask, intensity_image=field_intensity_arr):
@@ -120,7 +120,7 @@ def measure_nuc_cyto_ratio_nd2s(  # noqa: C901
         colocalized = dict(colocalize_rois(nuclear_mask, soma_mask))
         nuc_df["id"] = nuc_df["id"].map(colocalized)
         merged = nuc_df.merge(cyto_df, on="id").merge(soma_df, on="id")
-        merged.insert(0, "field", selector[Axes.FIELD])
+        merged.insert(0, "field", selector["field"])
         merged.insert(0, "region", region)
         df = pd.concat((df, merged))
 
@@ -136,13 +136,13 @@ def measure_nuc_cyto_ratio(  # noqa: C901
         measurement_channels: list[str] | None = None):
 
     if measurement_channels is None:
-        measurement_channels = collection[Axes.CHANNEL].values.tolist()
+        measurement_channels = collection["channel"].values.tolist()
 
     df = pd.DataFrame()
     for selector, obj_arr, _ in enumerate_rois(client, project_id):
 
         intensity_arr = collection.sel(selector)
-        channels = selector[Axes.CHANNEL].tolist()
+        channels = selector["channel"].tolist()
 
         nuc_idx = channels.index(nuc_channel)
         soma_idx = channels.index(soma_channel)
@@ -180,10 +180,10 @@ def measure_nuc_cyto_ratio(  # noqa: C901
 
         for channel in measurement_channels:  # type: ignore
             # sometimes these collections are inhomogenous and don't contain all the channels we're interested in
-            if channel not in intensity_arr[Axes.CHANNEL].values:
+            if channel not in intensity_arr["channel"].values:
                 continue
 
-            field_intensity_arr = intensity_arr.sel({Axes.CHANNEL: channel}).values
+            field_intensity_arr = intensity_arr.sel(channel=channel).values
 
             assert cyto_mask.shape == field_intensity_arr.shape, \
                 f"cyto mask and intensity array have different shapes: {cyto_mask.shape} | {field_intensity_arr.shape}"
@@ -215,8 +215,8 @@ def measure_nuc_cyto_ratio(  # noqa: C901
         colocalized = dict(colocalize_rois(nuclear_mask, soma_mask))
         nuc_df["id"] = nuc_df["id"].map(colocalized)
         merged = nuc_df.merge(cyto_df, on="id", suffixes=("_nuc", "_cyto"))
-        merged.insert(0, "field", selector[Axes.FIELD])
-        merged.insert(0, "region", selector[Axes.REGION])
+        merged.insert(0, "field", selector["field"])
+        merged.insert(0, "region", selector["region"])
         df = pd.concat((df, merged))
 
     return df

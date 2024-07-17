@@ -1,15 +1,15 @@
 from cytomancer.enumero import NaturalOrderStrEnum
+from enum import auto, StrEnum
 
 
-class Axes(NaturalOrderStrEnum):
-    REGION = "region"
-    FIELD = "field"
-    CHANNEL = "channel"
-    TIME = "time"
-    Y = "y"
-    X = "x"
-    Z = "z"
-    RGB = "rgb"
+class Axes(StrEnum):
+    region = auto()
+    field = auto()
+    channel = auto()
+    time = auto()
+    y = auto()
+    x = auto()
+    z = auto()
 
 
 class ExperimentType(NaturalOrderStrEnum):

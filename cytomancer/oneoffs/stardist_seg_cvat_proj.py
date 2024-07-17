@@ -8,7 +8,7 @@ import numpy as np
 from cytomancer.cvat.helpers import new_client_from_config, parse_selector, get_project, get_project_label_map
 from cytomancer.cvat.helpers import get_rles
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.experiment import ExperimentType
 from cytomancer.utils import load_experiment
 
 
@@ -44,8 +44,8 @@ def run(project_name: str, experiment_dir: Path, experiment_type: ExperimentType
     for task in tasks:
         selector = parse_selector(task.name)
 
-        chan_idx = int(np.where(selector[Axes.CHANNEL] == channel)[0][0])
-        selector[Axes.CHANNEL] = np.array(channel)
+        chan_idx = int(np.where(selector["channel"] == channel)[0][0])
+        selector["channel"] = np.array(channel)
         frame = intensity.sel(selector).values
         eqd = exposure.equalize_adapthist(frame, clip_limit=adapteq_clip_limit)
         med = filters.median(eqd, morphology.disk(median_filter_d))

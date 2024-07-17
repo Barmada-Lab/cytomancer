@@ -8,7 +8,6 @@ import click
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from cytomancer.experiment import Axes
 from cytomancer.config import config
 from .helpers import parse_selector
 
@@ -38,7 +37,7 @@ def analyze_survival(
     for task_meta in tqdm(tasks):
         length = task_meta.size
         try:
-            well = parse_selector(task_meta.name)[Axes.REGION]
+            well = parse_selector(task_meta.name)["region"]
         except ValueError:
             well = task_meta.name[:3]
         annotation = task_meta.get_annotations()

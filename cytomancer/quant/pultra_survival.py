@@ -7,15 +7,13 @@ from skimage.measure import regionprops
 from skimage.exposure import rescale_intensity
 from skimage import filters, exposure, morphology  # type: ignore
 from dask.distributed import Worker, get_client
-from fiftyone import ViewField as F
-import fiftyone as fo
 import xarray as xr
 import pandas as pd
 import numpy as np
 
 from cytomancer.utils import load_experiment
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType, Axes
+from cytomancer.experiment import ExperimentType
 from .pultra_classifier import load_classifier
 
 logger = logging.getLogger(__name__)
@@ -86,11 +84,11 @@ def process(intensity: xr.DataArray, seg_model, classifier: Pipeline):
 
     nuc_labels, preds = xr.apply_ufunc(
         process_field,
-        intensity.sel({Axes.CHANNEL: "DAPI"}).drop_vars(Axes.CHANNEL),
-        intensity.sel({Axes.CHANNEL: "GFP"}).drop_vars(Axes.CHANNEL),
-        intensity.sel({Axes.CHANNEL: "RFP"}).drop_vars(Axes.CHANNEL),
-        input_core_dims=[[Axes.Y, Axes.X], [Axes.Y, Axes.X], [Axes.Y, Axes.X]],
-        output_core_dims=[[Axes.Y, Axes.X], [Axes.Y, Axes.X]],
+        intensity.sel(channel="DAPI").drop_vars("channel"),
+        intensity.sel(channel="GFP").drop_vars("channel"),
+        intensity.sel(channel="RFP").drop_vars("channel"),
+        input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"]],
+        output_core_dims=[["y", "x"], ["y", "x"]],
         vectorize=True,
         dask="parallelized",
         output_dtypes=[np.uint16, np.uint8])
@@ -158,12 +156,6 @@ def run(
     results_dir = experiment_path / "results"
     results_dir.mkdir(exist_ok=True, parents=True)
 
-    dataset = None
-    if save_annotations and fo.dataset_exists(experiment_path.name):
-        dataset = fo.load_dataset(experiment_path.name)
-    elif save_annotations and not fo.dataset_exists(experiment_path.name):
-        logger.warn(f"Could not find dataset for {experiment_path.name}; did you run fiftyone ingest on your experiment? Annotations will not be saved.")
-
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     import tensorflow as tf
     tf.config.threading.set_intra_op_parallelism_threads(2)
@@ -173,15 +165,20 @@ def run(
 
     assert model is not None, "Could not load stardist model"
 
-    intensity = intensity.sel({Axes.REGION: ["C04"]})
+    intensity = intensity.sel(region=["C04"])
     store_path = results_dir / "survival_processed.zarr"
-    process(intensity, model, classifier).to_zarr(store_path, mode="w")
+    processed = process(intensity, model, classifier)
+
+    if save_annotations:
+        processed.to_zarr(store_path, mode="w")
+        processed = xr.open_zarr(store_path)
 
     df = (
-        quantify(xr.open_zarr(store_path))
+        quantify(processed)
         .to_dataframe(name="count", dim_order=["region", "field", "time"])
         .dropna()
     )
+
     df["count"] = df["count"].astype(int)
     df.to_csv(results_dir / "survival.csv")
 

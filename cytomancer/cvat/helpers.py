@@ -49,7 +49,7 @@ VALUE_DELIM = ":"
 
 def _fmt_coord_selector_str(label, coord_arr):
     arr = np.atleast_1d(coord_arr)
-    if label == Axes.TIME:
+    if label == "time":
         arr = arr.astype("long")
     if np.issubdtype(arr.dtype, np.str_):
         for value in arr:
@@ -61,18 +61,17 @@ def _fmt_coord_selector_str(label, coord_arr):
 
 def _parse_field_selector(selector: str):
     tokens = selector.split(FIELD_VALUE_DELIM)
-    field_name = tokens[0]
-    field_values = FIELD_VALUE_DELIM.join(tokens[1:])  # this allows field values to contain the FIELD_VALUE_DELIM, as is sometimes the case with filenames
+    axis = tokens[0]
 
-    try:
-        axis = Axes(field_name)
-    except ValueError:
-        raise ValueError(f"Invalid field name {field_name} in selector string {selector}")
+    if axis not in Axes.__members__:
+        raise ValueError(f"Invalid axis: {axis}")
+
+    field_values = FIELD_VALUE_DELIM.join(tokens[1:])  # this allows field values to contain the FIELD_VALUE_DELIM, as is sometimes the case with filenames
 
     target_dtype = np.str_
 
     match axis:
-        case Axes.TIME:
+        case "time":
             field_value_tokens = np.array([np.datetime64(int(ts), 'ns')for ts in field_values.split(VALUE_DELIM)])
             if field_value_tokens.size == 1:
                 field_value = field_value_tokens[0]
@@ -91,13 +90,13 @@ def _parse_field_selector(selector: str):
 def coord_selector(arr: xr.DataArray) -> str:
     """Derives a string-formatted selector from an array's coordinates."""
     coords = sorted(arr.coords.items())
-    filtered = filter(lambda coord: coord[0] not in [Axes.X, Axes.Y], coords)
+    filtered = filter(lambda coord: coord[0] not in ["x", "y"], coords)
     return FIELD_DELIM.join([
         _fmt_coord_selector_str(axis.value, coord.values) for axis, coord in filtered  # type: ignore
     ])
 
 
-def parse_selector(selector_str: str) -> dict[Axes, np.ndarray]:
+def parse_selector(selector_str: str) -> dict[str, np.ndarray]:
     """Parses a selector string into a dictionary of axes to values"""
     return dict(map(_parse_field_selector, selector_str.split(FIELD_DELIM)))  # type: ignore
 
