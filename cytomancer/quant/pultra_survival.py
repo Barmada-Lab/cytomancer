@@ -165,7 +165,6 @@ def run(
 
     assert model is not None, "Could not load stardist model"
 
-    intensity = intensity.sel(region=["C04"])
     store_path = results_dir / "survival_processed.zarr"
     processed = process(intensity, model, classifier)
 
