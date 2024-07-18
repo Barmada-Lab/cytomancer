@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cytomancer"
-version = "0.2.4"
+version = "0.2.5"
 description = ""
 authors = ["Jacob Waksmacki <jwaksmack@gmail.com>"]
 
@@ -43,12 +43,12 @@ more-itertools = "^10.2.0"
 celery = "^5.4.0"
 redis = "^5.0.4"
 pygithub = "^2.3.0"
-stardist = "0.8.5"
 fiftyone = "^0.24.0"
-tensorflow = "2.15.1"
 zarr = "^2.18.2"
 scipy = "^1.14.0"
 lifelines = "^0.29.0"
+stardist = "^0.9.1"
+tensorflow = "^2.17.0"
 
 [tool.poetry.group.dev]
 optional = true
