@@ -121,7 +121,7 @@ def run(
         experiment_path: Path,
         experiment_type: ExperimentType,
         svm_model_path: Path,
-        save_annotations: bool = False):
+        save_annotations: bool):
 
     client = get_client()
     logger.info(f"Connected to dask scheduler {client.scheduler}")
