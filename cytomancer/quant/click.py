@@ -62,6 +62,14 @@ def neurite_quant(experiment_dir: Path, experiment_type: ExperimentType, model_n
     run_neurite_quant.delay(str(experiment_dir), experiment_type, str(model_path))
 
 
+@click.command("stardist-nuc-seg")
+@experiment_dir_argument()
+def stardist_nuc_seg(experiment_dir: Path):
+    from cytomancer.quant.stardist_nuc_seg import run
+    with dask_client():
+        run(experiment_dir)
+
+
 def register(cli: click.Group):
     @cli.group("quant", help="Tools for quantifying data")
     @click.pass_context
@@ -70,4 +78,5 @@ def register(cli: click.Group):
 
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
+    quant_group.add_command(stardist_nuc_seg)
     # quant_group.add_command(neurite_quant)

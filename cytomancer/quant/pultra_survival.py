@@ -14,6 +14,7 @@ import numpy as np
 from cytomancer.utils import load_experiment
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
+from cytomancer.io.cyto_dir import load_dir
 from .pultra_classifier import load_classifier
 
 logger = logging.getLogger(__name__)
@@ -62,44 +63,38 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
     return preds
 
 
-def process(intensity: xr.DataArray, seg_model, classifier: Pipeline):
+def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipeline):
 
-    def process_field(dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray):
+    def process_field(dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray, nuc_labels: np.ndarray):
+
+        if np.issubdtype(nuc_labels.dtype, np.floating):
+            return (np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8))
 
         if np.isnan(dapi).any() or np.isnan(gfp).any() or np.isnan(rfp).any():
-            return (
-                np.full_like(dapi, np.iinfo(np.uint16).max, dtype=np.uint16),
-                np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
-            )
+            return (np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8))
 
-        footprint = morphology.disk(5)
-
-        rescaled = rescale_intensity(dapi, out_range="uint8")
-        med = filters.rank.median(rescaled, footprint)
-        eqd = exposure.equalize_adapthist(med, kernel_size=100, clip_limit=0.01)
-        nuc_labels = seg_model.predict_instances(eqd)[0].astype(np.uint16)  # type: ignore
         preds = predict(dapi, gfp, rfp, nuc_labels, classifier)
+        return preds
 
-        return nuc_labels, preds
-
-    nuc_labels, preds = xr.apply_ufunc(
+    preds = xr.apply_ufunc(
         process_field,
         intensity.sel(channel="DAPI").drop_vars("channel"),
         intensity.sel(channel="GFP").drop_vars("channel"),
         intensity.sel(channel="RFP").drop_vars("channel"),
-        input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"]],
-        output_core_dims=[["y", "x"], ["y", "x"]],
+        nuc_labels.sel(channel="DAPI").drop_vars("channel"),
+        input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"], ["y", "x"]],
+        output_core_dims=[["y", "x"]],
         vectorize=True,
         dask="parallelized",
-        output_dtypes=[np.uint16, np.uint8])
+        join="inner",
+        output_dtypes=[np.uint8])
 
     return xr.Dataset({
-        "nuc_labels": nuc_labels,
         "preds": preds
     })
 
 
-def quantify(results: xr.Dataset):
+def quantify(nuc_labels: xr.DataArray, preds: xr.DataArray):
 
     def quantify_field(nuc_labels, preds):
         if (nuc_labels == np.iinfo(np.uint16).max).all():
@@ -108,8 +103,8 @@ def quantify(results: xr.Dataset):
 
     return xr.apply_ufunc(
         quantify_field,
-        results["nuc_labels"],
-        results["preds"],
+        nuc_labels.sel(channel="DAPI").drop_vars("channel"),
+        preds,
         input_core_dims=[["y", "x"], ["y", "x"]],
         output_core_dims=[["count"]],
         dask_gufunc_kwargs={"output_sizes": {"count": 1}},
@@ -123,6 +118,10 @@ def run(
         svm_model_path: Path,
         save_annotations: bool):
 
+    results_dir = experiment_path / "results"
+    seg_results_dir = results_dir / "stardist_nuc_seg"
+    assert seg_results_dir.exists(), "Nuclear segmentation results not found. Please run nuclear segmentation first."
+
     client = get_client()
     logger.info(f"Connected to dask scheduler {client.scheduler}")
     logger.info(f"Dask dashboard available at {client.dashboard_link}")
@@ -133,50 +132,33 @@ def run(
         fmt = f"{dask_worker.id}|%(asctime)s|%(name)s|%(levelname)s: %(message)s"
         # disable GPU for workers. Although stardist is GPU accelerated, it's
         # faster to run many CPU workers in parallel
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
         logging.basicConfig(level=config.log_level, format=fmt)
         logging.getLogger("dask").setLevel(level=logging.WARN)
         logging.getLogger("distributed.nanny").setLevel(level=logging.WARN)
         logging.getLogger("distributed.scheduler").setLevel(level=logging.WARN)
         logging.getLogger("distributed.core").setLevel(level=logging.WARN)
         logging.getLogger("distributed.http").setLevel(level=logging.WARN)
-        import tensorflow as tf
-        tf.config.threading.set_intra_op_parallelism_threads(2)
-        tf.get_logger().setLevel('ERROR')
 
     client.register_worker_callbacks(init_logging)
+
+    nuc_labels = load_dir(seg_results_dir).isel(y=slice(0, 1998), x=slice(0, 1998))
+    intensity = load_experiment(experiment_path, experiment_type)
 
     logger.debug(f"loading classifier from {svm_model_path}")
     if (classifier := load_classifier(svm_model_path)) is None:
         raise ValueError(f"Could not load classifier model at path {svm_model_path}")
 
-    intensity = load_experiment(experiment_path, experiment_type)
+    preds = process(intensity, nuc_labels, classifier)
 
-    results_dir = experiment_path / "results"
-    results_dir.mkdir(exist_ok=True, parents=True)
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    import tensorflow as tf
-    tf.config.threading.set_intra_op_parallelism_threads(2)
-    tf.get_logger().setLevel('ERROR')
-    from stardist.models import StarDist2D
-    model = StarDist2D.from_pretrained("2D_versatile_fluo")
-
-    assert model is not None, "Could not load stardist model"
-
-    store_path = results_dir / "survival_processed.zarr"
-    processed = process(intensity, model, classifier)
-
+    print(preds)
     if save_annotations:
-        processed.to_zarr(store_path, mode="w")
-        processed = xr.open_zarr(store_path)
+        store_path = results_dir / "survival_processed.zarr"
+        preds.to_zarr(store_path, mode="w")
+        preds = xr.open_zarr(store_path)
 
-    df = (
-        quantify(processed)
-        .to_dataframe(name="count", dim_order=["region", "field", "time"])
-        .dropna()
-    )
+    foo = quantify(nuc_labels, preds["preds"])
+    print(foo)
+    df = foo.to_dataframe(name="count", dim_order=["region", "field", "time"]).dropna()
 
     df["count"] = df["count"].astype(int)
     df.to_csv(results_dir / "survival.csv")

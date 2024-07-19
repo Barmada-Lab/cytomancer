@@ -250,7 +250,7 @@ def load_df(df, shape, attrs) -> xr.DataArray:
 
     arr = read_indexed_ims(df)
 
-    labels = ["time", "channel", "region", "field", "z"]
+    labels = df.index.names
     arr = xr.DataArray(
         arr,
         dims=labels + ["y", "x"],
