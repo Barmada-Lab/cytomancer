@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cytomancer"
-version = "0.2.5"
+version = "0.3.0"
 description = ""
 authors = ["Jacob Waksmacki <jwaksmack@gmail.com>"]
 
