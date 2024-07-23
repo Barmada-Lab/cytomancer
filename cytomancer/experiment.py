@@ -1,5 +1,6 @@
 from cytomancer.enumero import NaturalOrderStrEnum
 from enum import auto, StrEnum
+from PIL import ImageColor
 
 
 class Axes(StrEnum):
@@ -18,3 +19,26 @@ class ExperimentType(NaturalOrderStrEnum):
     LUX = "lux"
     LEGACY = "legacy"
     LEGACY_ICC = "legacy-icc"
+
+
+def _get_float_color(hexcode: str):
+    rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
+    max_val = max(rgb)
+    rgb_corrected = tuple(map(lambda x: x / max_val, rgb))
+    return rgb_corrected
+
+
+_float_colors = {
+    "DAPI": "#007fff",
+    "RFP": "#ffe600",
+    "GFP": "#00ff00",
+    "Cy5": "#ff0000",
+    "white_light": "#ffffff",
+}
+
+
+def get_float_color(channel: str):
+    if channel in _float_colors:
+        return _get_float_color(_float_colors[channel])
+    else:
+        raise ValueError(f"Channel {channel} is not known")

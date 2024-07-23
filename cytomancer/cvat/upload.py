@@ -1,180 +1,54 @@
-import warnings
-import time
-from typing import Callable
-import pathlib as pl
-import tempfile
-import random
+from pathlib import Path
 import logging
+import tempfile
+import atexit
+import shutil
+import uuid
 
-from cvat_sdk import Client as CvatClient
-from cvat_sdk import Config
-from cvat_sdk.models import TaskWriteRequest, ProjectWriteRequest
-from skimage.exposure import rescale_intensity
-from toolz import curry
-from dask.distributed import Client as DaskClient
+from cvat_sdk.models import TaskWriteRequest
+from distributed import Client, as_completed
+from tqdm import tqdm
 import xarray as xr
-import tifffile
+import pandas as pd
 import click
+import dask
+import tifffile
 
-from cytomancer.ops import display
-from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
-from cytomancer.utils import load_experiment
-from .helpers import coord_selector
+from cytomancer.utils import load_experiment, iter_idx_prod
+from cytomancer.ops.display import apply_psuedocolor, clahe, rescale_intensity
+from cytomancer.config import config
+from .helpers import new_client_from_config, get_project, create_project, exponential_backoff
+
 
 logger = logging.getLogger(__name__)
 
 
-@curry
-def stage_single_frame(arr: xr.DataArray, tmpdir: pl.Path) -> list[pl.Path]:
-    selector_label = coord_selector(arr)
-    outpath = pl.Path(tmpdir) / f"{selector_label}.tif"
-    tifffile.imwrite(outpath, arr)
-    return [outpath]
+@dask.delayed
+def stage_task(arr: xr.DataArray, tmpdir: Path):
+    region_name = arr.coords["region"].values
+    task_name = f"{region_name}-{uuid.uuid4()}"
+    coords, files = [], []
+    for frame in iter_idx_prod(arr, subarr_dims=["y", "x"]):
+        tmpfile = tmpdir / f"{uuid.uuid4()}.tif"
+        tifffile.imwrite(tmpfile, frame.data)
+        coords.append(frame.coords)
+        files.append(tmpfile)
+
+    return task_name, coords, files
 
 
-@curry
-def stage_t_stack(arr: xr.DataArray, tmpdir: pl.Path) -> list[pl.Path]:
-    images = []
-    for t in arr["time"]:
-        frame = arr.sel(time=t)
-        selector_label = coord_selector(frame)
-        outpath = pl.Path(tmpdir) / f"{selector_label}.tif"
-        tifffile.imwrite(outpath, frame)
-        images.append(outpath)
-    return images
-
-
-@curry
-def stage_channel_stack(arr: xr.DataArray, tmpdir: pl.Path) -> list[pl.Path]:
-    images = []
-    for c in arr["channel"]:
-        frame = arr.sel(channel=c)
-        selector_label = coord_selector(frame)
-        outpath = pl.Path(tmpdir) / f"{selector_label}.tif"
-        tifffile.imwrite(outpath, frame)
-        images.append(outpath)
-    return images
-
-
-@curry
-def stage_z_stack(arr: xr.DataArray, tmpdir: pl.Path) -> list[pl.Path]:
-    images = []
-    for z in arr["z"]:
-        frame = arr.sel(z=z)
-        selector_label = coord_selector(frame)
-        outpath = pl.Path(tmpdir) / f"{selector_label}.tif"
-        tifffile.imwrite(outpath, frame)
-        images.append(outpath)
-    return images
-
-
-@curry
-def stage_basic_tiff(path: pl.Path, tmpdir: pl.Path) -> list[pl.Path]:
-    img = tifffile.imread(path)
-    rescaled = rescale_intensity(img, out_range="uint8")
-    outpath = tmpdir / path.name
-    tifffile.imwrite(outpath, rescaled)
-    return [outpath]
-
-
-def upload(client, project_id: int, label: str, images: list[pl.Path]):
-    for i in range(5):
-        try:
-            client.tasks.create_from_data(
-                spec=TaskWriteRequest(
-                    name=label,
-                    project_id=project_id),
-                resources=images,
-                data_params=dict(
-                    image_quality=100,
-                    sorting_method="predefined"))
-            return
-        except Exception as e:
-            if i == 4:
-                logger.error(f"Failed to upload {label} after 5 attempts. Skipping.")
-            else:
-                logger.warn(f"Error uploading {label}: {e}")
-                logger.warn(f"Retrying in {i ** 2} seconds")
-                time.sleep(i ** 2)
-
-
-def stage_and_upload(
-        client,
-        project_id: int,
-        label: str,
-        stage_arr: Callable[[pl.Path], list[pl.Path]]):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir = pl.Path(tmpdir)
-        images = stage_arr(tmpdir)
-        upload(client, project_id, label, images)
-
-
-def prep_experiment(
-        experiment_base: pl.Path,
-        mip: bool,
-        composite: bool,
-        experiment_type: ExperimentType,
-        rescale: float,
-        channels: str | list[str] | None,
-        apply_psuedocolor: bool = True,
-        to_uint8: bool = True,
-        fillna: bool = True):
-
-    intensity = load_experiment(experiment_base, experiment_type, fillna)
-
-    attrs = intensity.attrs
-
-    if channels is not None:
-        intensity = intensity.sel(channel=channels)
-
-    if mip:
-        if "z" not in intensity.dims:
-            raise ValueError("MIP requested but no z-dimension found")
-        intensity = intensity.max(dim="z")
-
-    if apply_psuedocolor:
-        intensity = display.apply_psuedocolor(intensity).assign_attrs(attrs)
-
-    if composite:
-        if "channel" not in intensity.dims:
-            warnings.warn("Composite requested but no channel dimension found; ignoring")
-        intensity = intensity.mean(dim="channel")
-
-    if to_uint8:
-        intensity = display.rescale_intensity(
-            intensity, ["y", "x"], in_percentile=(rescale, 100 - rescale), out_range="uint8")
-
-    return intensity
-
-
-@click.command("upload-raw")
-@click.argument("project_name", type=str)
-@click.argument("collection_base", type=click.Path(exists=True, file_okay=False, path_type=pl.Path))
-def cli_entry_basic(
-        project_name: str,
-        collection_base: pl.Path):
-
-    client = CvatClient(url=config.cvat_url, config=Config(verify_ssl=False))
-    client.login((config.cvat_username, config.cvat_password))
-
-    org_slug = config.cvat_org
-    client.organization_slug = org_slug
-
-    (data, _) = client.api_client.projects_api.list(search=project_name)
-    if data is None or len(data.results) == 0:
-        (project, _) = client.api_client.projects_api.create(
-            ProjectWriteRequest(name=project_name)  # type: ignore
-        )
-
-    else:
-        project = next(filter(lambda x: x.name == project_name, data.results))
-
-    project_id = project.id  # type: ignore
-
-    for path in collection_base.glob("**/*.tif"):
-        stage_and_upload(client, project_id, path.stem, stage_basic_tiff(path))  # type: ignore
+@exponential_backoff(max_retries=5, base_delay=0.1)
+def upload_task(cvat_client, project_id, task_name, files):
+    cvat_client.tasks.create_from_data(
+        spec=TaskWriteRequest(
+            name=task_name,
+            project_id=project_id),  # type: ignore
+        resources=files,
+        data_params=dict(
+            image_quality=100,
+            sorting_method="predefined"))
 
 
 @click.command("upload-experiment")
@@ -184,112 +58,94 @@ def cli_entry_basic(
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to include. Defaults to all channels")
 @click.option("--regions", type=str, default="", help="comma-separated list of regions to include. Defaults to all regions")
 @click.option("--tps", type=str, default="", help="comma-separated list of timepoints to upload. Defaults to all timepoints")
-@click.option("--composite", is_flag=True, default=False, help="composite channels if set, else uploads each channel separately")
-@click.option("--mip", is_flag=True, default=False, help="apply MIP to each z-stack")
-@click.option("--dims", type=click.Choice(["XY", "TXY", "CXY", "ZXY"]), default="XY", help="dims of uploaded stacks")
-@click.option("--rescale", type=float, default=0.0,
-              help="""rescales images by stretching the range of their values to be bounded
-                by the given percentile range, e.g. a value of 1 will rescale an image
-                so that 0 1st percentile and 255 is the 99th percentile""")
 @click.option("--samples-per-region", type=int, default=-1, help="number of fields to upload per region")
-@click.option("--fillna", is_flag=True, default=False, help="interpolate missing images")
-def cli_entry_experiment(
+@click.option("--composite", is_flag=True, default=False, help="composite channels if set, else uploads each channel separately")
+@click.option("--projection", type=click.Choice(["none", "sum", "maximum_intensity"]), default="none", help="apply MIP to each z-stack")
+@click.option("--dims", type=click.Choice(["yx", "tyx", "cyx", "zyx"]), default="yx", help="dims of uploaded stacks")
+@click.option("--clahe-clip", type=float, default=0.00,
+              help="""Clip limit for contrast limited adaptive histogram equalization. Enhances
+              contrast for easier annotation of dim structures, but may misrepresent relative
+              intensities within each field. Set above 0 to enable. """)
+def cli_entry(  # noqa: C901
         project_name: str,
-        experiment_dir: pl.Path,
+        experiment_dir: Path,
         experiment_type: ExperimentType,
         channels: str,
         regions: str,
         tps: str,
-        composite: bool,
-        mip: bool,
-        dims: str,
-        rescale: float,
         samples_per_region: int,
-        fillna: bool):
+        composite: bool,
+        projection: str,
+        dims: str,
+        clahe_clip: float):
 
-    dask_client = DaskClient()
-    logger.info(f"Dashboard link: {dask_client.dashboard_link}")
+    # dims are provided as individual characters, need to map to xarray dims
+    dim_mapping = {"t": "time", "c": "channel", "z": "z", "y": "y", "x": "x"}
+    subarr_dims = [dim_mapping[dim] for dim in dims]
 
-    channel_list = None if channels == "" else channels.split(",")
-    if channel_list is not None and len(channel_list) == 1:
-        channel_list = channel_list[0]
+    experiment = load_experiment(experiment_dir, experiment_type)
 
-    if experiment_type == ExperimentType.ND2:
-        logger.info("Loading ND2 files... this may take a while.")
-        collections = [prep_experiment(nd2_file, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna) for nd2_file in experiment_dir.glob("**/*.nd2")]  # noqa: E501
+    if channels:
+        experiment = experiment.sel(channel=channels.split(","))
+
+    if regions:
+        experiment = experiment.sel(region=regions.split(","))
+
+    if tps:
+        experiment = experiment.isel(time=list(map(int, tps.split(","))))
+
+    match projection:
+        case "sum":
+            experiment = experiment.sum("z")
+        case "maximum_intensity":
+            experiment = experiment.max("z")
+        case "none":
+            pass
+
+    if clahe_clip > 0:
+        experiment = clahe(experiment, clahe_clip)
+
+    if composite:
+        psuedocolor = apply_psuedocolor(experiment)
+        experiment = psuedocolor.mean("channel")
+        subarr_dims.append("rgb")
     else:
-        collections = [prep_experiment(experiment_dir, mip, composite, experiment_type, rescale, channel_list, apply_psuedocolor=True, fillna=fillna)]  # noqa: E501
+        experiment = rescale_intensity(experiment, dims=["y", "x"], out_range="uint8")
 
-    client = CvatClient(url=config.cvat_url)
-    client.login((config.cvat_username, config.cvat_password))
+    cvat_client = new_client_from_config(config)
 
-    org_slug = config.cvat_org
-    client.organization_slug = org_slug
+    if (project := get_project(cvat_client, project_name)) is None:
+        project = create_project(cvat_client, project_name)
 
-    (data, _) = client.api_client.projects_api.list(search=project_name)
-    if data is None or len(data.results) == 0:
-        (project, _) = client.api_client.projects_api.create(
-            ProjectWriteRequest(name=project_name)  # type: ignore
-        )
+    project_id = project.id
 
-    else:
-        project = next(filter(lambda x: x.name == project_name, data.results))
+    dask_client = Client(n_workers=12, threads_per_worker=3)
 
-    project_id = project.id  # type: ignore
+    tmpdir = Path(tempfile.mkdtemp(dir=config.scratch_dir))
+    atexit.register(lambda: shutil.rmtree(tmpdir))
 
-    for collection in collections:
-        logger.info(f"uploading {collection.coords['region']}")
-        if tps != "":
-            tps_list = [int(tp) for tp in tps.split(",")]
-            if len(tps_list) > 1:
-                collection = collection.isel({"time": tps_list})
-            else:
-                collection = collection.isel({"time": tps_list[0]})
-        if regions != "":
-            regions_list = [region for region in regions.split(",")]
-            collection = collection.sel(region=regions_list)
-        match dims:
-            case "XY":
-                assert {*collection.dims} == {"region", "field", "x", "y", "rgb"}, collection.dims
-                for region in collection["region"]:
-                    region_arr = collection.sel(region=region)
-                    sample = collection["field"] if samples_per_region == -1 else random.sample([field for field in collection["field"]], samples_per_region)  # noqa: E501
-                    for field in sample:
-                        arr = region_arr.sel(field=field)
-                        selector_label = coord_selector(arr)
-                        stage_and_upload(client, project_id, selector_label, stage_single_frame(arr))  # type: ignore
+    upload_tasks = []
+    for arr in iter_idx_prod(experiment, subarr_dims=subarr_dims):
+        upload_tasks.append(stage_task(arr, tmpdir))
 
-            case "TXY":
-                assert {*collection.dims} == {"region", "field", "time", "x", "y", "rgb"}, collection.dims
-                for region in collection["region"]:
-                    sample = collection["field"] if samples_per_region == -1 else random.sample([field for field in collection["field"]], samples_per_region)  # noqa: E501
-                    region_arr = collection.sel(region=region)
-                    for field in sample:
-                        arr = region_arr.sel(field=field)
-                        selector_label = coord_selector(arr)
-                        stage_and_upload(client, project_id, selector_label, stage_t_stack(arr))  # type: ignore
+    uploaded_coords = []
+    uploaded_paths = []
+    result_iter = as_completed(dask_client.compute(upload_tasks), with_results=True)
+    for _, (task_name, coords, files) in tqdm(result_iter, total=len(upload_tasks)):  # type: ignore
+        try:
+            upload_task(cvat_client, project_id, task_name, files)
+            uploaded_coords += coords
+            uploaded_paths += files
+        except Exception as e:
+            logger.error(f"Failed to upload {task_name}: {e}. Skipping.")
 
-            case "CXY":
-                assert {*collection.dims} == {"region", "field", "channel", "x", "y", "rgb"}, collection.dims
-                for region in collection["region"]:
-                    region_arr = collection.sel(region=region)
-                    sample = collection["field"] if samples_per_region == -1 else random.sample([field for field in collection["field"]], samples_per_region)
-                    for field in sample:
-                        arr = region_arr.sel(field=field)
-                        selector_label = coord_selector(arr)
-                        stage_and_upload(client, project_id, selector_label, stage_channel_stack(arr))  # type: ignore
+    records = []
+    for coord, path in zip(uploaded_coords, uploaded_paths):
+        record = {dim: coord[dim].values for dim in coord}
+        record["path"] = path.name
+        records.append(record)
 
-            case "ZXY":
-                assert {*collection.dims} == {"region", "field", "z", "x", "y", "rgb"}, collection.dims
-                for region in collection["region"]:
-                    region_arr = collection.sel(region=region)
-                    sample = collection["field"] if samples_per_region == -1 else random.sample([field for field in collection["field"]], samples_per_region)
-                    for field in sample:
-                        arr = region_arr.sel(field=field)
-                        selector_label = coord_selector(arr)
-                        stage_and_upload(client, project_id, selector_label, stage_z_stack(arr))  # type: ignore
-
-            case _:
-                raise ValueError(f"Unknown dims {dims}")
-
-    logger.info("Done!")
+    results_dir = experiment_dir / "results"
+    pd.DataFrame \
+        .from_records(records) \
+        .to_csv(results_dir / "cvat_upload_records.csv", index=False)

@@ -1,5 +1,6 @@
-from itertools import groupby
 from skimage.measure import regionprops
+from itertools import groupby
+import time
 
 from cvat_sdk import Client, Config
 import xarray as xr
@@ -9,16 +10,32 @@ from cytomancer.config import CytomancerConfig
 from cytomancer.experiment import Axes
 
 
+def exponential_backoff(max_retries=5, base_delay=0.1):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            retries = 0
+            delay = base_delay
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    if retries >= max_retries:
+                        raise e
+                    retries += 1
+                    delay *= 2
+                    time.sleep(delay)
+        return wrapper
+    return decorator
+
+
 def new_client_from_config(config: CytomancerConfig):
     client = Client(url=config.cvat_url, config=Config(verify_ssl=False))
     client.login((config.cvat_username, config.cvat_password))
-
-    org_slug = config.cvat_org
-    client.organization_slug = org_slug
+    client.organization_slug = config.cvat_org
     return client
 
 
-def test_cvat_connection(cvat_url, cvat_username, cvat_password):
+def test_cvat_credentials(cvat_url, cvat_username, cvat_password):
     """
     Test the connection to a CVAT server.
 
@@ -173,6 +190,14 @@ def enumerate_rois(client: Client, project_id: int):
         obj_arr, label_arr = get_obj_arr_and_labels(anno_table, len(frames), height, width)
         selector = parse_selector(task_meta.name)
         yield selector, obj_arr, label_arr
+
+
+def create_project(client: Client, project_name: str):
+    """
+    Creates a new project with the given name
+    """
+    project = client.projects.create(dict(name=project_name))
+    return project
 
 
 def get_project(client: Client, project_name: str):

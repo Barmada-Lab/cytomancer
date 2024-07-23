@@ -40,12 +40,12 @@ def apply_ufunc_xy(
         **kwargs)
 
 
-def iter_idx_prod(arr: xr.DataArray | xr.Dataset, ignore_dims=[]):
+def iter_idx_prod(arr: xr.DataArray | xr.Dataset, subarr_dims=[]):
     """
     Iterates over the product of an array's indices. Can be used to iterate over
     all the (coordinate-less) XY(Z) planes in an experiment.
     """
-    indices = [name for name in arr.indexes if name not in ignore_dims]
+    indices = [name for name in arr.indexes if name not in subarr_dims]
     idxs = list([arr.indexes[name] for name in indices])
     for coords in product(*idxs):
         selector = dict(zip(indices, coords))

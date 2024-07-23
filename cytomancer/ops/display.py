@@ -1,6 +1,5 @@
 from PIL import ImageColor
-from skimage import exposure, color, util, morphology, filters  # type: ignore
-import pandas as pd
+from skimage import exposure, color, util  # type: ignore
 import xarray as xr
 import numpy as np
 
@@ -26,32 +25,29 @@ def rescale_intensity(arr: xr.DataArray, dims: list[str], **kwargs):
         dask="parallelized")
 
 
-def clahe(arr: xr.DataArray):
+def clahe(arr: xr.DataArray, clip_limit: float):
 
-    def _clahe(frame):
-        rescaled = exposure.rescale_intensity(frame, out_range=np.uint8)
-        footprint = morphology.disk(3)
-        blurred = filters.median(rescaled, footprint)
-        clahe = exposure.equalize_adapthist(blurred, 128, clip_limit=0.03)
-        return clahe
+    def _clahe(frame, clip_limit):
+        rescaled = exposure.rescale_intensity(frame, out_range=(0, 1))
+        return exposure.equalize_adapthist(rescaled, clip_limit=clip_limit)
 
     return xr.apply_ufunc(
         _clahe,
         arr,
+        kwargs=dict(clip_limit=clip_limit),
         input_core_dims=[["y", "x"]],
         output_core_dims=[["y", "x"]],
         vectorize=True,
         dask="parallelized")
 
 
-def _get_float_color(hexcode: str):
-    rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
-    max_val = max(rgb)
-    rgb_corrected = tuple(map(lambda x: x / max_val, rgb))
-    return rgb_corrected
+def apply_psuedocolor(arr: xr.DataArray) -> xr.DataArray:
 
-
-def apply_psuedocolor(arr: xr.DataArray):
+    def _get_float_color(hexcode: str):
+        rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
+        max_val = max(rgb)
+        rgb_corrected = tuple(map(lambda x: x / max_val, rgb))
+        return rgb_corrected
 
     if "metadata" in arr.attrs:
         channels = arr.attrs["metadata"]["metadata"].channels
@@ -90,20 +86,3 @@ def apply_psuedocolor(arr: xr.DataArray):
         dask="parallelized")
 
     return rgb.transpose(..., "rgb")
-
-
-def stitch(arr: xr.DataArray, trim: float = 0.05):
-    # TODO: arrange tiles correctly
-    trimmed = arr.sel(
-        y=slice(int(arr["y"].size * trim), int(arr["y"].size * (1 - trim))),
-        x=slice(int(arr["x"].size * trim), int(arr["x"].size * (1 - trim)))
-    )
-    field_dim = np.sqrt(arr["field"].size).astype(int)
-    mi = pd.MultiIndex.from_product(
-        (range(field_dim), range(field_dim)), names=["fx", "fy"])
-    mindex_coords = xr.Coordinates.from_pandas_multiindex(mi, "field")
-    trimmed = trimmed.assign_coords(mindex_coords).unstack("field")
-
-    x_stitched = xr.concat(trimmed.transpose("fx", ..., "y", "x")[::-1], dim="y")
-    stitched = xr.concat(x_stitched.transpose("fy", ..., "x", "y")[::-1], dim="x")
-    return stitched.drop(["fx", "fy"])
