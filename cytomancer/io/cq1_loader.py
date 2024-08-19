@@ -45,32 +45,9 @@ def _try_parse_dir(path: pl.Path) -> datetime | None:
     return None
 
 
-def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901, get bent flake8
-    """
-    Load an individual CQ1 acquisition directory. If no argument is provided for
-    ome_xml_filename, the function will automatically load an ome.xml file from
-    the directory based on the following priority:
+def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent flake8
 
-        1. MeasurementResult.ome.xml
-        2. MeasurementResultMIP.ome.xml
-        3. MeasurementResultSUM.ome.xml
-    """
-
-    if ome_xml_filename is not None:
-        if not (xml_path := path / ome_xml_filename).exists():
-            raise ValueError(f"Could not find {ome_xml_filename} in {path}")
-        ome_xml = ome_types.from_xml(xml_path)
-    elif (xml_path := path / "MeasurementResult.ome.xml").exists():
-        ome_xml_filename = "MeasurementResult.ome.xml"
-        ome_xml = ome_types.from_xml(xml_path)
-    elif (xml_path := path / "MeasurementResultMIP.ome.xml").exists():
-        ome_xml_filename = "MeasurementResultMIP.ome.xml"
-        ome_xml = ome_types.from_xml(xml_path)
-    elif (xml_path := path / "MeasurementResultSUM.ome.xml").exists():
-        ome_xml_filename = "MeasurementResultSUM.ome.xml"
-        ome_xml = ome_types.from_xml(xml_path)
-    else:
-        raise ValueError(f"Could not find an ome.xml file in {path}.")
+    ome_xml = ome_types.from_xml(path / ome_xml_filename)
 
     result_xml_path = path / "ImagingResult.xml"
     assert result_xml_path.exists(), f"Could not find ImagingResult.xml in {path}."
@@ -156,7 +133,7 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str | None = None):  # noqa: C901
     return holy_df, shape, attrs
 
 
-def get_experiment_df_detailed(base_path: pl.Path, ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
+def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip", ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
     """
     Indexes a CQ1 experiment directory by timepoint, channel, region, field, and z-slice.
 
@@ -184,41 +161,43 @@ def get_experiment_df_detailed(base_path: pl.Path, ordinal_time: bool = False) -
         )
         return df.set_index(new_index)
 
-    if _try_parse_dir(base_path) is not None:
-        return get_tp_df(base_path)
+    match measurement_type.strip().lower():
+        case "mip":
+            measurement_file = "MeasurementResultMIP.ome.xml"
+        case "sum":
+            measurement_file = "MeasurementResultSUM.ome.xml"
+        case "raw":
+            measurement_file = "MeasurementResult.ome.xml"
+        case _:
+            raise ValueError(f"Unknown measurement type: {measurement_type}")
 
-    else:
-        dt_paths = [(_try_parse_dir(d), d) for d in base_path.iterdir() if d.is_dir()]
-        dt_paths = [(dt, path) for dt, path in dt_paths if dt is not None]
-        dt_paths = sorted(dt_paths, key=lambda d: d[0])
+    acquisitions = list(base_path.glob(f"*/{measurement_file}"))
+    if len(acquisitions) == 0:
+        raise ValueError("Could not find any acquisition directories in {base_path}.")
 
-        shape, attrs = None, None
-        df = pd.DataFrame()
-        if any(dt_paths) and ordinal_time:
-            for i, (_, path) in enumerate(dt_paths):
-                tp_df, tp_shape, tp_attrs = get_tp_df(path)
-                assert shape is None or shape == tp_shape, f"Shape mismatch: {shape} vs {tp_shape}"
-                assert attrs is None or attrs == tp_attrs, f"Attribute mismatch: {attrs} vs {tp_attrs}"
-                shape, attrs = tp_shape, tp_attrs
-                reindexed = reindex_time(tp_df, i)
-                df = pd.concat([df, reindexed])
-            return df, shape, attrs  # type: ignore
+    tps = [_try_parse_dir(acq.parent) for acq in acquisitions]
+    if None in tps:
+        raise ValueError(f"One or more acquisition directories in {base_path} are not named according to the CQ1 convention, and cannot be parsed. \
+                          Please verify acquisition directory names.")
 
-        elif any(dt_paths) and not ordinal_time:
-            for _, path in dt_paths:
-                tp_df, tp_shape, tp_attrs = get_tp_df(path)
-                assert shape is None or shape == tp_shape, f"Shape mismatch: {shape} vs {tp_shape}"
-                assert attrs is None or attrs == tp_attrs, f"Attribute mismatch: {attrs} vs {tp_attrs}"
-                shape, attrs = tp_shape, tp_attrs
-                df = pd.concat([df, tp_df])
-            return df, shape, attrs  # type: ignore
+    dt_paths = [(tp, path) for tp, path in zip(tps, acquisitions) if tp is not None]
+    dt_paths = sorted(dt_paths, key=lambda d: d[0])
 
-        else:
-            raise ValueError(f"Could not find any acquisition directories in {base_path}.")
+    shape, attrs = None, None
+    df = pd.DataFrame()
+    for i, (_, path) in enumerate(dt_paths):
+        tp_df, tp_shape, tp_attrs = get_tp_df(path.parent, measurement_file)
+        assert shape is None or shape == tp_shape, f"Shape mismatch: {shape} vs {tp_shape}"
+        assert attrs is None or attrs == tp_attrs, f"Attribute mismatch: {attrs} vs {tp_attrs}"
+        shape, attrs = tp_shape, tp_attrs
+        if ordinal_time:
+            tp_df = reindex_time(tp_df, i)
+        df = pd.concat([df, tp_df])
+    return df, shape, attrs  # type: ignore
 
 
 def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> pd.DataFrame:
-    return get_experiment_df_detailed(base_path, ordinal_time)[0]
+    return get_experiment_df_detailed(base_path, ordinal_time=ordinal_time)[0]
 
 
 def load_df(df, shape, attrs) -> xr.DataArray:
