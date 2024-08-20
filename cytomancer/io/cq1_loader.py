@@ -24,7 +24,8 @@ CQ1_WELLPLATE_NAME_REGEX = r"^W(?P<well_idx>\d*)\(.*\),A.*,F(?P<field_idx>\d*)$"
 CHANNEL_EX_EM_LUT = {
     (405, 447): "DAPI",
     (488, 525): "GFP",
-    (561, 617): "RFP"
+    (561, 617): "RFP",
+    (640, 685): "Cy5",
 }
 
 PLATE_WELL_LUT = {
@@ -131,6 +132,11 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
     holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index().replace({np.nan: None})
 
     return holy_df, shape, attrs
+    
+
+def tablefmt(d: dict, title: str | None = None) -> str:
+    fmtd = "" if title is None else f"{title}:\n--------\n"
+    return fmtd + "\n".join([f"{k}: {v}" for k, v in d.items()])
 
 
 def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip", ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
@@ -184,7 +190,7 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
     dt_paths = sorted(dt_paths, key=lambda d: d[0])
 
     shape, attrs = None, None
-    df = pd.DataFrame()
+    dfs = []
     for i, (_, path) in enumerate(dt_paths):
         tp_df, tp_shape, tp_attrs = get_tp_df(path.parent, measurement_file)
         assert shape is None or shape == tp_shape, f"Shape mismatch: {shape} vs {tp_shape}"
@@ -192,7 +198,26 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
         shape, attrs = tp_shape, tp_attrs
         if ordinal_time:
             tp_df = reindex_time(tp_df, i)
-        df = pd.concat([df, tp_df])
+        dfs.append(tp_df)
+
+    # validate homogeneity
+
+    channels = {acq[1].parent.name: set(df.index.get_level_values("channel")) for acq, df in zip(dt_paths, dfs)}
+    example_chans = list(channels.values())[0]
+    if not all(c == example_chans for c in channels.values()):
+        raise ValueError(f"Channels are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(channels)}")
+
+    regions = {acq[1].parent.name: set(df.index.get_level_values("region")) for acq, df in zip(dt_paths, dfs)}
+    example_regions = list(regions.values())[0]
+    if not all(r == example_regions for r in regions.values()):
+        raise ValueError(f"Regions are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(regions)}")
+    
+    fields = {acq[1].parent.name: set(df.index.get_level_values("field")) for acq, df in zip(dt_paths, dfs)}
+    example_fields = list(fields.values())[0]
+    if not all(f == example_fields for f in fields.values()):
+        raise ValueError(f"Fields are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(fields)}")
+
+    df = pd.concat(dfs)
     return df, shape, attrs  # type: ignore
 
 
