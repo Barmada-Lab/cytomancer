@@ -235,7 +235,7 @@ def load_df(df, shape, attrs) -> xr.DataArray:
         elif not path.exists():
             logger.warning(f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs...")
             return np.full(shape, np.nan)
-        return tifffile.imread(path).astype(np.float16)
+        return tifffile.imread(path).astype(np.uint16)
 
     def read_indexed_ims(recurrence):
         """
@@ -244,7 +244,7 @@ def load_df(df, shape, attrs) -> xr.DataArray:
         """
         if type(recurrence) is pd.Series:
             path = recurrence["path"]
-            return da.from_delayed(dask.delayed(read_img)(path), shape, dtype=np.float16)
+            return da.from_delayed(dask.delayed(read_img)(path), shape, dtype=np.uint16)
         else:  # type(recurrence) is pd.DataFrame
             if type(recurrence.index) is pd.MultiIndex:
                 level = recurrence.index.levels[0]  # type: ignore
