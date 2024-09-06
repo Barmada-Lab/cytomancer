@@ -1,4 +1,5 @@
 import click
+from pathlib import Path
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
@@ -77,6 +78,19 @@ def nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_labe
     nuc_cyto_coloc_measure(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label)
 
 
+@click.command("export")
+@experiment_dir_argument()
+@click.option("--project_name", type=str, default="", help="Name of the CVAT project to export. Defaults to experiment directory name")
+def export_annotations(experiment_dir: Path, project_name: str):
+    from .export import export_annotations as export_annotations_impl
+    from .helpers import new_client_from_config
+    from cytomancer.config import config
+    if project_name == "":
+        project_name = experiment_dir.name
+    client = new_client_from_config(config)
+    export_annotations_impl(client, project_name, experiment_dir)
+
+
 def register(cli: click.Group):
     @cli.group("cvat", help="Tools for working with CVAT")
     @click.pass_context
@@ -92,3 +106,4 @@ def register(cli: click.Group):
     cvat_group.add_command(measure)
     cvat_group.add_command(nuc_cyto)
     cvat_group.add_command(nuc_cyto_legacy)
+    cvat_group.add_command(export_annotations)
