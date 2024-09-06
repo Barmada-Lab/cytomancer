@@ -14,6 +14,10 @@ import dask
 logger = logging.getLogger(__name__)
 
 
+META_JSON = "meta.json"
+SUMMARY_CSV = "summary.csv"
+
+
 @dataclass
 class CytoMeta:
     shape: tuple
@@ -28,11 +32,9 @@ class CytoMeta:
         return CytoMeta(**json.loads(path.read_text()))
 
 
-def get_experiment_df(path: Path):
-    csv_path = path / "summary.csv"
+def _get_experiment_df(csv_path: Path):
     assert csv_path.exists(), f"File not found: {csv_path}, is this a valid cyto dir?"
     df = pd.read_csv(csv_path)
-    df["path"] = df["path"].apply(lambda x: path / x)
     df["time"] = pd.to_datetime(df["time"])
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
@@ -42,14 +44,13 @@ def get_experiment_df(path: Path):
     return holy_df
 
 
-def get_experiment_meta(path: Path):
-    meta_path = path / "meta.json"
+def _get_experiment_meta(meta_path: Path):
     assert meta_path.exists(), f"File not found: {meta_path}, is this a valid cyto dir?"
     meta = CytoMeta.load_json(meta_path)
     return meta
 
 
-def load_df(df, meta: CytoMeta):
+def _load_df(df, meta: CytoMeta):
 
     def read_img(path):
         logger.debug(f"Reading {path}")
@@ -92,7 +93,16 @@ def load_df(df, meta: CytoMeta):
     return arr
 
 
-def load_dir(path: Path):
-    df = get_experiment_df(path)
-    meta = get_experiment_meta(path)
-    return load_df(df, meta)
+def load_dir(img_dir: Path, summary_csv: Path | None = None, meta_json: Path | None = None):
+
+    if summary_csv is None:
+        summary_csv = img_dir / SUMMARY_CSV
+
+    if meta_json is None:
+        meta_json = img_dir / META_JSON
+
+    df = _get_experiment_df(summary_csv)
+    df["path"] = df["path"].apply(lambda x: img_dir / x)
+    meta = _get_experiment_meta(meta_json)
+
+    return _load_df(df, meta)
