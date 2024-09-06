@@ -1,104 +1,192 @@
-import pathlib as pl
+from pathlib import Path
+from typing import Callable
+from dataclasses import dataclass
+import logging
+import shutil
 
-from cvat_sdk import Client, Config
-from skimage.measure import regionprops
-import pandas as pd
+from pycocotools.coco import COCO
 import xarray as xr
-import click
+import pandas as pd
+import numpy as np
 
-from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
-from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
-from .upload import prep_experiment
-from .helpers import enumerate_rois
+from cytomancer.utils import load_experiment, iter_idx_prod
+from cytomancer.cvat.helpers import new_client_from_config
+from cytomancer.config import config
+from cytomancer.cvat.export import export_annotations
+
+logger = logging.getLogger(__name__)
 
 
-def measure_2d(
-        client: Client,
-        project_id: int,
-        collections: dict[str, xr.DataArray],
-        measurement_channels: list[str]):
-
-    df = pd.DataFrame()
-    for selector, obj_arr, _ in enumerate_rois(client, project_id):
-        collection = list(collections.values())[0]
-        intensity_arr = collection.sel(selector)
-        for rois in obj_arr:
-
-            field_measurements = []
-            for props in regionprops(rois):
-                field_measurements.append({
-                    "id": props.label,
-                    "region": selector["region"],
-                    "field": selector["field"],
-                    "area": props.area,
-                })
-            field_df = pd.DataFrame.from_records(field_measurements)
-
-            for channel in measurement_channels:
-                field_intensity_arr = intensity_arr.sel(channel=channel).values
-                print(field_intensity_arr.min(), field_intensity_arr.max())
-                for props in regionprops(rois, intensity_image=field_intensity_arr):
-                    mask = rois == props.label
-                    field_df.loc[
-                        field_df["id"] == props.label, f"{channel}_intensity_sum"] = field_intensity_arr[mask].sum()
-                    field_df.loc[
-                        field_df["id"] == props.label, f"{channel}_intensity_std"] = field_intensity_arr[mask].std()
-
-            df = pd.concat((df, field_df))
-
-    return df
+@dataclass
+class Roi:
+    id: int
+    label: str
+    mask: np.ndarray
 
 
-@click.command("measure")
-@click.argument("project_name", type=str)
-@experiment_dir_argument()
-@experiment_type_argument()
-@click.option("--channels", type=str, default="", help="comma-separated list of channels to measure")
-@click.option("--mip", is_flag=True, default=False, help="apply MIP to each z-stack")
-@click.option("--dims", type=click.Choice(["XY", "TXY", "CXY", "ZXY"]), default="XY", help="dims of uploaded stacks")
-def cli_entry(
-        project_name: str,
-        experiment_dir: pl.Path,
+def broadcast_and_concat(f: Callable[[np.ndarray, np.ndarray], pd.DataFrame]) -> Callable[[np.ndarray, xr.DataArray], pd.DataFrame]:
+    def wrapper(mask: np.ndarray, intensity: xr.DataArray) -> pd.DataFrame:
+        measurement_df = pd.DataFrame()
+        for frame in iter_idx_prod(intensity, subarr_dims=["y", "x"]):
+            coords = {coord: frame.coords[coord].values for coord in frame.coords}
+            frame_measurements = f(mask, frame.values).assign(**coords)  # type: ignore
+            measurement_df = pd.concat([measurement_df, frame_measurements])
+        return measurement_df
+    return wrapper
+
+
+@broadcast_and_concat
+def mean_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
+    measurement_name = "mean"
+    assert measurement_name in measurement_fn_lut
+    return pd.DataFrame.from_records([{measurement_name: np.mean(intensity[mask])}])
+
+
+@broadcast_and_concat
+def median_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
+    measurement_name = "median"
+    assert measurement_name in measurement_fn_lut
+    return pd.DataFrame.from_records([{measurement_name: np.median(intensity[mask])}])
+
+
+@broadcast_and_concat
+def area_roi(mask: np.ndarray, _: np.ndarray) -> pd.DataFrame:
+    measurement_name = "area"
+    assert measurement_name in measurement_fn_lut
+    return pd.DataFrame.from_records([{measurement_name: np.sum(mask)}])
+
+
+@broadcast_and_concat
+def std_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
+    measurement_name = "std"
+    assert measurement_name in measurement_fn_lut
+    return pd.DataFrame.from_records([{measurement_name: np.std(intensity[mask])}])
+
+
+def measure(roi: Roi, intensity: xr.DataArray, measurement_names):
+
+    roi_meta = {"roi_id": roi.id, "label": roi.label}
+    dfs = []
+    for measurement_name in measurement_names:
+        measurement_fn = measurement_fn_lut[measurement_name]
+        measurement = measurement_fn(roi.mask, intensity).assign(**roi_meta)
+        dfs.append(measurement)
+
+    merged = dfs[0]
+    for df in dfs[1:]:
+        merged = pd.merge(merged, df)
+
+    return merged
+
+
+measurement_fn_lut = {
+    'mean': mean_roi,
+    'median': median_roi,
+    'area': area_roi,
+    'std': std_roi
+}
+
+
+broadcast_modes = {
+    "channel",
+    "z",
+    "time"
+}
+
+
+def measure_experiment(  # noqa: C901
+        experiment_dir: Path,
         experiment_type: ExperimentType,
-        channels: str,
-        mip: bool,
-        dims: str):
+        roi_set_name: str,
+        measurement_names: set[str],
+        z_projection_mode: str = "none",
+        roi_broadcasting: list[str] = []):
 
-    channel_list = channels.split(",")
-    if channel_list == [""]:
-        raise ValueError("Must provide at least one channel to measure")
+    if (not_supported := measurement_names - measurement_fn_lut.keys()):
+        raise ValueError(f"Invalid measurements: {not_supported}")
 
-    if experiment_type == "nd2s":
-        collections = {nd2_file.name: prep_experiment(nd2_file, mip, False, experiment_type, 0.0, None, False) for nd2_file in experiment_dir.glob("**/*.nd2")}
-    else:
-        collections = {experiment_dir.name: prep_experiment(experiment_dir, mip, False, experiment_type, rescale=0.0, channels=None, apply_psuedocolor=False, to_uint8=False, fillna=False)}
+    if (not_supported := set(roi_broadcasting) - broadcast_modes):
+        raise ValueError(f"Invalid broadcast mode: {not_supported}")
 
-    output_dir = experiment_dir / "results"
-    output_dir.mkdir(exist_ok=True)
+    if z_projection_mode not in ["none", "max", "sum"]:
+        raise ValueError(f"Invalid intensity projection: {z_projection_mode}")
 
-    client = Client(url=config.cvat_url, config=Config(verify_ssl=False))
-    client.login((config.cvat_username, config.cvat_password))
-    org_slug = config.cvat_org
-    client.organization_slug = org_slug
+    exp_cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
+    if not exp_cache_dir.exists():
+        try:
+            logger.info("Caching experiment as zarray... this may take a few minutes.")
+            intensity = load_experiment(experiment_dir, experiment_type)
+            intensity.attrs = {}
+            ds = xr.Dataset(dict(intensity=intensity))
+            ds.to_zarr(exp_cache_dir, mode="w")
+        except Exception as e:
+            logger.error(f"Failed to cache experiment! {e}")
+            shutil.rmtree(exp_cache_dir, ignore_errors=True)
 
-    (data, _) = client.api_client.projects_api.list(search=project_name)
-    assert data is not None and len(data.results) > 0, \
-        f"No project matching {project_name} in {org_slug}; create a project in the webapp first"
+    intensity = xr.open_zarr(exp_cache_dir).intensity
 
-    project = next(filter(lambda x: x.name == project_name, data.results))
-    project_id = project.id
+    match z_projection_mode:
+        case "none":
+            pass
+        case "mip":
+            intensity = intensity.max("z")
+        case "sum":
+            intensity = intensity.sum("z")
 
-    match dims:
-        case "XY":
-            df = measure_2d(client, project_id, collections, channel_list)
-            df.to_csv(output_dir / "measurements_CVAT.csv", index=False)
-            return
-        case "TXY":
-            raise NotImplementedError("TXY measurements not implemented")
-        case "CXY":
-            raise NotImplementedError("CXY measurements not implemented")
-        case "ZXY":
-            raise NotImplementedError("ZXY measurements not implemented")
-        case _:
-            raise ValueError(f"Unknown dims {dims}")
+    if z_projection_mode != "none" and "z" in roi_broadcasting:
+        raise ValueError("Cannot broadcast over z axis with z projection enabled. Disable one or the other.")
+
+    upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
+    if not upload_record_location.exists():
+        raise FileNotFoundError(f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?")
+
+    dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
+    task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"]).set_index("frame")
+
+    annotations_location = experiment_dir / "results" / "annotations" / roi_set_name
+    if not annotations_location.exists():
+        raise FileNotFoundError(f"Annotations not found at {annotations_location}! Export annotations with 'cyto cvat export' before measuring.")
+
+    annotations = COCO(annotations_location)
+
+    cat_map = {id: cat["name"] for id, cat in annotations.cats.items()}
+
+    measurements_df = pd.DataFrame()
+    for img in annotations.imgs.values():
+        file_name = img["file_name"]
+
+        selector = task_df.loc[file_name].to_dict()
+        for broadcast_dim in roi_broadcasting:
+            selector.pop(broadcast_dim)
+
+        subarr = intensity.sel(selector).load()
+        for annotation in annotations.imgToAnns[img["id"]]:
+            roi = Roi(
+                id=annotation["id"],
+                label=cat_map[annotation["category_id"]],
+                mask=(annotations.annToMask(annotation) == 1)
+            )
+
+            if file_name not in task_df.index:
+                logger.error(f"{file_name} not found in {upload_record_location}! Skipping.")
+                continue
+
+            roi_measurements = measure(roi, subarr, measurement_names)
+            measurements_df = pd.concat([measurements_df, roi_measurements])
+
+    column_order = measurements_df.columns.tolist()
+    for col in measurement_names:
+        column_order.remove(col)
+        column_order.append(col)
+
+    measurements_df = measurements_df.reindex(columns=column_order)
+
+    roi_set_name_stripped = roi_set_name.replace(".json", "")
+    output_dir = experiment_dir / "results" / "measurements"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    measurements_df.to_csv(
+        output_dir / f"measurements_{roi_set_name_stripped}.csv",
+        index=False,
+        float_format="%.3f")

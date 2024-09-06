@@ -1,13 +1,17 @@
 from itertools import product
+from typing import TypeVar, Generator
 import pathlib as pl
+import random
 
 import xarray as xr
 
 from cytomancer.io.legacy_loader import load_legacy, load_legacy_icc
-from cytomancer.io.nd2_loader import load_nd2
+from cytomancer.io.nd2_loader import load_nd2_collection
 from cytomancer.io.lux_loader import load_lux
 from cytomancer.io.cq1_loader import load_cq1
 from cytomancer.experiment import ExperimentType
+
+T = TypeVar("T", xr.DataArray, xr.Dataset)
 
 
 def load_experiment(path: pl.Path, experiment_type: ExperimentType, fillna: bool = False) -> xr.DataArray:
@@ -17,7 +21,7 @@ def load_experiment(path: pl.Path, experiment_type: ExperimentType, fillna: bool
         case ExperimentType.LEGACY_ICC:
             return load_legacy_icc(path, fillna)
         case ExperimentType.ND2:
-            return load_nd2(path)
+            return load_nd2_collection(path)
         case ExperimentType.LUX:
             return load_lux(path, fillna)
         case ExperimentType.CQ1:
@@ -40,14 +44,16 @@ def apply_ufunc_xy(
         **kwargs)
 
 
-def iter_idx_prod(arr: xr.DataArray | xr.Dataset, subarr_dims=[]):
+def iter_idx_prod(arr: T, subarr_dims=[], shuffle=False) -> Generator[T, None, None]:
     """
     Iterates over the product of an array's indices. Can be used to iterate over
     all the (coordinate-less) XY(Z) planes in an experiment.
     """
     indices = [name for name in arr.indexes if name not in subarr_dims]
-    idxs = list([arr.indexes[name] for name in indices])
-    for coords in product(*idxs):
+    idxs = list(product(*[arr.indexes[name] for name in indices]))
+    if shuffle:
+        random.shuffle(idxs)
+    for coords in idxs:
         selector = dict(zip(indices, coords))
         yield arr.sel(selector)
 

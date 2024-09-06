@@ -51,6 +51,7 @@ scipy = "^1.14.0"
 lifelines = "^0.29.0"
 dask-cuda = "^24.6.0"
 imagecodecs = "^2024.6.1"
+pycocotools = "^2.0.8"
 
 [tool.poetry.group.dev]
 optional = true
