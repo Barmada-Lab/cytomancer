@@ -173,7 +173,7 @@ def upload_experiment(
     dim_mapping = {"t": "time", "c": "channel", "z": "z", "y": "y", "x": "x"}
     subarr_dims = [dim_mapping[dim] for dim in dims]
 
-    df = handle_upload(
+    df = do_upload(
         project_name,
         experiment,
         channels_list,
