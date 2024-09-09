@@ -90,6 +90,8 @@ def export_annotations(experiment_dir: Path, project_name: str):
         project_name = experiment_dir.name
     client = new_client_from_config(config)
     export_annotations_impl(client, project_name, experiment_dir)
+    from .colocalize import do_nuc_cyto
+    do_nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label)
 
 
 def register(cli: click.Group):
