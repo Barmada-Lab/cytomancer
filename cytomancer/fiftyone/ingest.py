@@ -22,12 +22,12 @@ def get_or_create_dataset(name: str) -> fo.Dataset:
     media_dir.mkdir(parents=True, exist_ok=True)
 
     if fo.dataset_exists(name):
-        raise ValueError("Dataset already exists; delete before re-ingesting")
-
-    dataset = fo.Dataset(name=name)
-    dataset.info["media_dir"] = str(media_dir)  # type: ignore
-    dataset.persistent = True
-    return dataset
+        return fo.load_dataset(name)
+    else:
+        dataset = fo.Dataset(name=name)
+        dataset.info["media_dir"] = str(media_dir)  # type: ignore
+        dataset.persistent = True
+        return dataset
 
 
 def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
@@ -75,7 +75,7 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
     dataset.save()
 
 
-def ingest_cq1(base_path: Path):
+def do_ingest_cq1(base_path: Path):
     dataset = get_or_create_dataset(base_path.name)
     df = cq1_loader.get_experiment_df(base_path)
     ingest_experiment_df(dataset, df)

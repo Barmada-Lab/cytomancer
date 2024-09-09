@@ -1,5 +1,4 @@
 from pathlib import Path
-import tempfile
 
 from skimage import morphology
 from pycocotools.coco import COCO
@@ -8,10 +7,10 @@ import xarray as xr
 import numpy as np
 import cv2
 
-from cytomancer.cvat.upload import handle_upload
-from cytomancer.cvat.colocalize import handle_nuc_cyto
+from cytomancer.cvat.upload import do_upload
+from cytomancer.cvat.colocalize import nuc_cyto
 from cytomancer.cvat.helpers import new_client_from_config, get_project
-from cytomancer.cvat.export import handle_export
+from cytomancer.cvat.export import export
 from cytomancer.config import config
 
 
@@ -41,7 +40,7 @@ def make_synthetic_nuc_cyto_data(gfp_nuc_i: int = 64, gfp_cyto_i: int = 32, dapi
 
 def upload_synthetic_nuc_cyto_data(output_dir: Path):
     experiment = make_synthetic_nuc_cyto_data()
-    task_df = handle_upload("synthetic_nuc_cyto", experiment, ["GFP", "DAPI"], [], [], False, "none", ["channel", "x", "y"], 0, False)
+    task_df = do_upload("synthetic_nuc_cyto", experiment, ["GFP", "DAPI"], [], [], False, "none", ["channel", "x", "y"], 0, False)
     zarr_output = output_dir / "synthetic_nuc_cyto.zarr"
     ds = xr.Dataset(dict(intensity=experiment))
     ds.to_zarr(zarr_output, mode="w")
@@ -54,7 +53,7 @@ def measure_synthetic_nuc_cyto_data(output_dir: Path):
     dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
     task_df = pd.read_csv(output_dir / "synthetic_nuc_cyto_task.csv", dtype=dtype_spec, parse_dates=["time"])
     annotations = COCO(output_dir / "cvat_instances_default.json")
-    df = handle_nuc_cyto(experiment, task_df, annotations, "nucleus", "soma")
+    df = nuc_cyto(experiment, task_df, annotations, "nucleus", "soma")
     df.to_csv(output_dir / "synthetic_nuc_cyto_measurements.csv", index=False)
 
 
@@ -62,5 +61,5 @@ def test_nuc_cyto(output_dir: Path):
     client = new_client_from_config(config)
     if get_project(client, "synthetic_nuc_cyto") is None:
         upload_synthetic_nuc_cyto_data(output_dir)
-    handle_export(client, "synthetic_nuc_cyto", output_dir, "COCO 1.0")
+    export(client, "synthetic_nuc_cyto", output_dir, "COCO 1.0")
     measure_synthetic_nuc_cyto_data(output_dir)

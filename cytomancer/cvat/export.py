@@ -9,7 +9,7 @@ from .helpers import get_project
 logger = logging.getLogger(__name__)
 
 
-def handle_export(cvat_client, project_name: str, export_path: Path, format: str):
+def export(cvat_client, project_name: str, export_path: Path, format: str):
 
     if (project := get_project(cvat_client, project_name)) is None:
         raise ValueError(f"No project with name {project_name} found")
@@ -28,7 +28,7 @@ def handle_export(cvat_client, project_name: str, export_path: Path, format: str
             logger.info(f"Exported {export_file}")
 
 
-def export_annotations(cvat_client, project_name: str, experiment_dir: Path, format: str = "COCO 1.0"):
+def do_export(cvat_client, project_name: str, experiment_dir: Path, format: str = "COCO 1.0"):
     """
     exports annotations from cvat to an experiment's results directory
     """
@@ -36,4 +36,4 @@ def export_annotations(cvat_client, project_name: str, experiment_dir: Path, for
     results_dir = experiment_dir / "results" / "annotations"
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    handle_export(cvat_client, project_name, results_dir, format)
+    export(cvat_client, project_name, results_dir, format)

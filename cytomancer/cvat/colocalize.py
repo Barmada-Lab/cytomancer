@@ -60,7 +60,7 @@ def group_rois(file_coords: pd.DataFrame, coco_set: COCO, variable_dims: list[st
         yield dict(zip(coords, roi_coords)), annotations
 
 
-def handle_nuc_cyto(
+def nuc_cyto(
         intensity: xr.DataArray,
         task_df: pd.DataFrame,
         annotations: COCO,
@@ -113,8 +113,7 @@ def handle_nuc_cyto(
     return pd.DataFrame.from_records(measurements)
 
 
-
-def nuc_cyto_coloc_measure(  # noqa: C901
+def do_nuc_cyto(  # noqa: C901
         experiment_dir: Path,
         experiment_type: ExperimentType,
         roi_set_name: str,
@@ -148,7 +147,7 @@ def nuc_cyto_coloc_measure(  # noqa: C901
 
     annotations = COCO(annotations_location)
 
-    df = handle_nuc_cyto(intensity, task_df, annotations, nuc_label, soma_label)
+    df = nuc_cyto(intensity, task_df, annotations, nuc_label, soma_label)
 
     measurement_output = experiment_dir / "results" / "measurements"
     measurement_output.mkdir(parents=True, exist_ok=True)

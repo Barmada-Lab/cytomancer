@@ -75,8 +75,8 @@ def measure(experiment_dir, experiment_type, roi_set_name, measurements, z_proje
 @click.option("--nuc-label", type=str, default="nucleus", help="Name of the nucleus label in the ROI set")
 @click.option("--soma-label", type=str, default="soma", help="Name of the soma label in the ROI set")
 def nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label):
-    from .colocalize import nuc_cyto_coloc_measure
-    nuc_cyto_coloc_measure(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label)
+    from .colocalize import do_nuc_cyto
+    do_nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label)
 
 
 @click.command("export")

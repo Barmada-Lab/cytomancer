@@ -6,9 +6,10 @@ import time
 import fiftyone as fo
 import click
 
-from cytomancer.click_utils import experiment_dir_argument
+from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.dask import dask_client
-from .ingest import ingest_cq1
+from cytomancer.experiment import ExperimentType
+from .ingest import do_ingest_cq1
 from .zhuzh import zhuzh
 
 
@@ -33,11 +34,13 @@ def delete_dataset(dataset_name: str) -> None:
     fo.delete_dataset(dataset_name)
 
 
-@click.command("ingest", help=inspect.getdoc(ingest_cq1))
+@click.command("ingest")
 @experiment_dir_argument()
-def ingest(experiment_dir: Path) -> None:
+@experiment_type_argument()
+@click.option("--name", default="", help="Name of the dataset to create; defaults to the name of experiment_dir")
+def ingest(experiment_dir: Path, experiment_type: ExperimentType, name) -> None:
     with dask_client():
-        ingest_cq1(experiment_dir)
+        do_ingest_cq1(experiment_dir)
 
 
 @click.command("zhuzh", help=inspect.getdoc(zhuzh))
