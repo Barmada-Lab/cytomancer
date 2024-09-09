@@ -1,16 +1,8 @@
-from skimage.measure import regionprops
-from itertools import groupby
-from dataclasses import dataclass
 import time
 
 from cvat_sdk import Client, Config
-from tqdm import tqdm
-import pandas as pd
-import xarray as xr
-import numpy as np
 
 from cytomancer.config import CytomancerConfig
-from cytomancer.experiment import Axes
 
 
 def exponential_backoff(max_retries=5, base_delay=0.1):
@@ -59,75 +51,6 @@ def test_cvat_credentials(cvat_url, cvat_username, cvat_password):
     except ApiException as e:
         print(f"Error: {e.body}")
         return False
-
-
-# ex. field-1|region-B02|channel-GFP:RFP:Cy5|time-1:2:3:4:5:6:7:8:9:10
-def _fmt_coord_selector_str(label, coord_arr):
-    arr = np.atleast_1d(coord_arr)
-    if label == "time":
-        arr = arr.astype("long")
-    if np.issubdtype(arr.dtype, np.str_):
-        for value in arr:
-            assert FIELD_DELIM not in value, f"{label} value {value} is invalid; contains a '|'; rename and try again"
-            assert VALUE_DELIM not in value, f"{label} value {value} is invalid; contains a ':'; rename and try again"
-
-    return f"{label}{FIELD_VALUE_DELIM}" + VALUE_DELIM.join(map(str, arr))
-
-
-def coord_selector(arr: xr.DataArray) -> str:
-    """Derives a string-formatted selector from an array's coordinates."""
-    coords = sorted(arr.coords.items())
-    filtered = filter(lambda coord: coord[0] not in ["x", "y"], coords)
-    return FIELD_DELIM.join([
-        _fmt_coord_selector_str(axis.value, coord.values) for axis, coord in filtered  # type: ignore
-    ])
-
-
-
-def mask_to_rle(mask: np.ndarray) -> list[int]:
-    counts = []
-    for i, (value, elements) in enumerate(groupby(mask.flatten())):
-        if i == 0 and value == 1:
-            counts.append(0)
-        counts.append(len(list(elements)))
-    return counts
-
-
-def get_rles(labelled_arr: np.ndarray):
-    rles = []
-    for props in regionprops(labelled_arr):
-        id = props.label
-        mask = labelled_arr == id
-        top, left, bottom, right = props.bbox
-        rle = mask_to_rle(mask[top:bottom, left:right])
-        rle += [left, top, right-1, bottom-1]
-
-        left, top, right, bottom = rle[-4:]
-        patch_height, patch_width = (bottom - top + 1, right - left + 1)
-        patch_mask = rle_to_mask(rle[:-4], patch_width, patch_height)
-
-        assert np.all(patch_mask == mask[top:bottom+1, left:right+1])
-        rles.append((id, rle))
-    return rles
-
-
-def enumerate_rois(client: Client, project_id: int, progress: bool = False):
-    """
-    enumerates all ROIs in a project on a frame-by-frame basis
-    """
-    tasks = client.projects.retrieve(project_id).get_tasks()
-    if progress:
-        tasks = tqdm(tasks)
-    for task_meta in tasks:
-        jobs = task_meta.get_jobs()
-        job_id = jobs[0].id  # we assume there is only one job per task
-        job_metadata = client.jobs.retrieve(job_id).get_meta()
-        frames = job_metadata.frames
-        height, width = frames[0].height, frames[0].width
-        anno_table = task_meta.get_annotations()
-        obj_arr, label_arr = get_obj_arr_and_labels(anno_table, len(frames), height, width)
-        for frame, obj_frame, label_frame in zip(frames, obj_arr, label_arr):
-            yield frame.name, obj_frame, label_frame
 
 
 def create_project(client: Client, project_name: str):

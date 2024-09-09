@@ -11,9 +11,7 @@ import numpy as np
 
 from cytomancer.experiment import ExperimentType
 from cytomancer.utils import load_experiment, iter_idx_prod
-from cytomancer.cvat.helpers import new_client_from_config
 from cytomancer.config import config
-from cytomancer.cvat.export import export_annotations
 
 logger = logging.getLogger(__name__)
 
