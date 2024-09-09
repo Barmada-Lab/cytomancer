@@ -153,12 +153,12 @@ def run(
     print(preds)
     if save_annotations:
         store_path = results_dir / "survival_processed.zarr"
+        preds["nuc_labels"] = nuc_labels
         preds.to_zarr(store_path, mode="w")
         preds = xr.open_zarr(store_path)
 
-    foo = quantify(nuc_labels, preds["preds"])
-    print(foo)
-    df = foo.to_dataframe(name="count", dim_order=["region", "field", "time"]).dropna()
+    quantified = quantify(nuc_labels, preds["preds"])
+    df = quantified.to_dataframe(name="count", dim_order=["region", "field", "time"]).dropna()
 
     df["count"] = df["count"].astype(int)
     df.to_csv(results_dir / "survival.csv")
