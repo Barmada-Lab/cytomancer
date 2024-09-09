@@ -35,6 +35,7 @@ def auth(cvat_username, cvat_password):
 @click.option("--project_name", type=str, default="", help="Name of the CVAT project to create. Defaults to experiment directory name")
 @click.option("--channels", type=str, default="", help="comma-separated list of channels to include. Defaults to all channels")
 @click.option("--regions", type=str, default="", help="comma-separated list of regions to include. Defaults to all regions")
+@click.option("--fields", type=str, default="", help="comma-separated list of fields to include. Defaults to all fields")
 @click.option("--tps", type=str, default="", help="comma-separated list of timepoints to upload. Defaults to all timepoints")
 @click.option("--composite", is_flag=True, default=False, help="composite channels if set, else uploads each channel separately")
 @click.option("--projection", type=click.Choice(["none", "sum", "maximum_intensity"]), default="none", help="apply MIP to each z-stack")

@@ -66,6 +66,7 @@ def handle_upload(  # noqa: C901
         experiment: xr.DataArray,
         channels: list[str],
         regions: list[str],
+        fields: list[str],
         tps: list[str],
         composite: bool,
         projection: str,
@@ -80,6 +81,9 @@ def handle_upload(  # noqa: C901
 
     if len(regions) > 0:
         experiment = experiment.sel(region=regions)
+
+    if len(fields) > 0:
+        experiment = experiment.sel(field=fields)
 
     if len(tps) > 0:
         experiment = experiment.isel(time=list(map(int, tps)))
@@ -132,6 +136,7 @@ def upload_experiment(
         project_name: str,
         channels: str,
         regions: str,
+        fields: str,
         tps: str,
         composite: bool,
         projection: str,
@@ -160,6 +165,7 @@ def upload_experiment(
         return
 
     channels_list = channels.split(",") if channels else []
+    fields_list = fields.split(",") if fields else []
     regions_list = regions.split(",") if regions else []
     tps_list = tps.split(",") if tps else []
 
@@ -168,16 +174,17 @@ def upload_experiment(
     subarr_dims = [dim_mapping[dim] for dim in dims]
 
     df = handle_upload(
-        project_name,
-        experiment,
-        channels_list,
-        regions_list,
-        tps_list,
-        composite,
-        projection,
-        subarr_dims,
-        clahe_clip,
-        blind)
+        project_name=project_name,
+        experiment=experiment,
+        channels=channels_list,
+        regions=regions_list,
+        fields=fields_list,
+        tps=tps_list,
+        composite=composite,
+        projection=projection,
+        subarr_dims=subarr_dims,
+        clahe_clip=clahe_clip,
+        blind=blind)
 
     cvat_upload_records = experiment_dir / "results" / "cvat_upload.csv"
     cvat_upload_records.parent.mkdir(parents=True, exist_ok=True)
