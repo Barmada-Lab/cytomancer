@@ -173,18 +173,17 @@ def upload_experiment(
     dim_mapping = {"t": "time", "c": "channel", "z": "z", "y": "y", "x": "x"}
     subarr_dims = [dim_mapping[dim] for dim in dims]
 
-    df = do_upload(
-        project_name=project_name,
-        experiment=experiment,
-        channels=channels_list,
-        regions=regions_list,
-        fields=fields_list,
-        tps=tps_list,
-        composite=composite,
-        projection=projection,
-        subarr_dims=subarr_dims,
-        clahe_clip=clahe_clip,
-        blind=blind)
+    df = handle_upload(
+        project_name,
+        experiment,
+        channels_list,
+        regions_list,
+        tps_list,
+        composite,
+        projection,
+        subarr_dims,
+        clahe_clip,
+        blind)
 
     cvat_upload_records = experiment_dir / "results" / "cvat_upload.csv"
     cvat_upload_records.parent.mkdir(parents=True, exist_ok=True)
