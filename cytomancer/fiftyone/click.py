@@ -9,6 +9,7 @@ import click
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.dask import dask_client
 from cytomancer.experiment import ExperimentType
+from .import_survival import do_import_survival_results
 from .ingest import do_ingest_cq1
 from .zhuzh import zhuzh
 
@@ -43,6 +44,15 @@ def ingest(experiment_dir: Path, experiment_type: ExperimentType, name) -> None:
         do_ingest_cq1(experiment_dir)
 
 
+@click.command("import-survival")
+@experiment_dir_argument()
+@click.option("--dataset-name", default="", help="Name of the dataset to import to; defaults to the name of experiment_dir")
+def import_survival(experiment_dir: Path, dataset_name: str) -> None:
+    if dataset_name == "":
+        dataset_name = experiment_dir.name
+    do_import_survival_results(experiment_dir, dataset_name)
+
+
 @click.command("zhuzh", help=inspect.getdoc(zhuzh))
 @click.argument("dataset_name")
 def run_zhuzh(dataset_name: str) -> None:
@@ -59,3 +69,4 @@ def register(cli: click.Group) -> None:
     fiftyone.add_command(launch_app)
     fiftyone.add_command(delete_dataset)
     fiftyone.add_command(run_zhuzh)
+    fiftyone.add_command(import_survival)
