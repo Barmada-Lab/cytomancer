@@ -12,7 +12,8 @@ import pandas as pd
 import numpy as np
 import joblib
 
-from cytomancer.cvat.helpers import new_client_from_config, get_project, get_project_label_map, enumerate_rois
+from cytomancer.cvat.helpers import new_client_from_config, get_project, get_project_label_map
+from cytomancer.cvat.nuc_cyto_legacy import enumerate_rois
 from cytomancer.config import config
 
 logger = logging.getLogger(__name__)

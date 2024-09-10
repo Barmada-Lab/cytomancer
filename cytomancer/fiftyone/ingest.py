@@ -40,12 +40,12 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
     def prepare_sample(coord_row):
         coords, row = coord_row
         path = row["path"]
-        tags_dict = dict(zip(axes, coords))
+        fields_dict = dict(zip(axes, coords))
 
-        tags_dict["region_field_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"]]))
-        tags_dict["time_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"], tags_dict["channel"]]))
-        tags_dict["channel_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["z"], tags_dict["time"]]))
-        tags_dict["z_stack_key"] = "-".join(map(str, [tags_dict["region"], tags_dict["field"], tags_dict["time"], tags_dict["channel"]]))
+        fields_dict["region_field_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"]]))
+        fields_dict["time_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"], fields_dict["channel"]]))
+        fields_dict["channel_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"], fields_dict["time"]]))
+        fields_dict["z_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["time"], fields_dict["channel"]]))
 
         arr = tifffile.imread(path)
         rescaled = exposure.rescale_intensity(arr, out_range="uint8")
@@ -53,13 +53,14 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
         png_path = media_dir / f"{uuid.uuid4()}.png"
         image.save(png_path, format="PNG")
 
-        return (path, png_path, tags_dict)
+        return (path, png_path, fields_dict)
 
     samples = list(map(prepare_sample, df.iterrows()))
     results = as_completed(client.compute(samples), with_results=True)
     for _, (raw_path, png_path, tags) in tqdm(results, total=len(samples)):  # type: ignore
         sample = fo.Sample(filepath=png_path)
         sample["raw_path"] = str(raw_path)  # attach the rawpath for quantitative stuff
+        print(type(tags["time"]), tags["time"])
         for key, value in tags.items():
             sample[key] = value
         dataset.add_sample(sample)
