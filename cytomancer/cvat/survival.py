@@ -48,4 +48,4 @@ def cli_entry(project_name: str, experiment_dir: pl.Path):
 
     survival_output = results_dir / "cvat_survival.csv"
 
-    analyze_survival(project.tasks).to_csv(survival_output, index=False)
+    analyze_survival(project.get_tasks()).to_csv(survival_output, index=False)
