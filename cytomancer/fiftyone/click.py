@@ -39,9 +39,18 @@ def delete_dataset(dataset_name: str) -> None:
 @experiment_dir_argument()
 @experiment_type_argument()
 @click.option("--name", default="", help="Name of the dataset to create; defaults to the name of experiment_dir")
-def ingest(experiment_dir: Path, experiment_type: ExperimentType, name) -> None:
+@click.option("--regions", default="", help="Comma-separated list of regions to ingest")
+@click.option("--fields", default="", help="Comma-separated list of fields to ingest")
+@click.option("--channels", default="", help="Comma-separated list of channels to ingest")
+@click.option("--timepoints", default="", help="Comma-separated list of timepoints to ingest")
+def ingest(experiment_dir: Path, experiment_type: ExperimentType, name: str, regions, fields, channels, timepoints) -> None:
+    regions = regions.split(",") if regions else []
+    fields = fields.split(",") if fields else []
+    timepoints = [int(t) for t in timepoints.split(",")] if timepoints else []
+    channels = channels.split(",") if channels else []
+    name = name if name else experiment_dir.name
     with dask_client():
-        do_ingest_cq1(experiment_dir)
+        do_ingest_cq1(experiment_dir, name, regions, fields, channels, timepoints)
 
 
 @click.command("import-survival")

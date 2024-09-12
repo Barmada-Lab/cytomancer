@@ -33,7 +33,7 @@ def get_or_create_dataset(name: str) -> fo.Dataset:
 def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
 
     client = get_client()
-    axes = df.index.names  # type: ignore
+    axes = df.index.names
     media_dir = Path(dataset.info["media_dir"])  # type: ignore
 
     @dask.delayed
@@ -75,7 +75,29 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
     dataset.save()
 
 
-def do_ingest_cq1(base_path: Path):
-    dataset = get_or_create_dataset(base_path.name)
-    df = cq1_loader.get_experiment_df(base_path)
+def do_ingest_cq1(
+        base_path: Path,
+        name: str,
+        regions: list[str],
+        fields: list[str],
+        channels: list[str],
+        timepoints: list[int]):
+
+    dataset = get_or_create_dataset(name)
+    df = cq1_loader.get_experiment_df(base_path).reset_index()
+
+    if regions:
+        df = df[df["region"].isin(regions)]
+
+    if fields:
+        df = df[df["field"].isin(fields)]
+
+    if channels:
+        df = df[df["channel"].isin(channels)]
+
+    if timepoints:
+        df = df[df["timepoint"].isin(timepoints)]
+
+    df = df.set_index(["region", "field", "timepoint", "time", "channel", "z"])
+
     ingest_experiment_df(dataset, df)

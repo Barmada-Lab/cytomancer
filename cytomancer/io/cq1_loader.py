@@ -113,7 +113,7 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
             image_path = data.uuid.file_name
             assert image_path is not None, f"Data block {data.id} has no file name."
             records.append({
-                "time": t,
+                "timepoint": t,
                 "channel": c,
                 "region": well_label,
                 "field": field_idx_label,
@@ -122,10 +122,10 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
             })
 
     df = pd.DataFrame.from_records(records)
-    df = df[["time", "channel", "region", "field", "z", "path"]]  # explicitly order columns
-    ts = df["time"].unique().size
+    df = df[["timepoint", "channel", "region", "field", "z", "path"]]  # explicitly order columns
+    ts = df["timepoint"].unique().size
     acq_delta = acquisition_delta / ts
-    df["time"] = df["time"].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
+    df["time"] = df["timepoint"].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
     holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
