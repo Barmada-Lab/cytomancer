@@ -60,7 +60,6 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
     for _, (raw_path, png_path, tags) in tqdm(results, total=len(samples)):  # type: ignore
         sample = fo.Sample(filepath=png_path)
         sample["raw_path"] = str(raw_path)  # attach the rawpath for quantitative stuff
-        print(type(tags["time"]), tags["time"])
         for key, value in tags.items():
             sample[key] = value
         dataset.add_sample(sample)
