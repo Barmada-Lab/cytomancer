@@ -5,6 +5,7 @@ from cytomancer.click_utils import experiment_dir_argument, experiment_type_argu
 from cytomancer.config import config
 from cytomancer.dask import dask_client
 from .nuc_cyto_legacy import cli_entry as nuc_cyto_legacy
+from .legacy_survival import cli_entry as analyze_survival_legacy
 from .measure import measure_experiment, measurement_fn_lut
 from .helpers import test_cvat_credentials
 
@@ -108,3 +109,4 @@ def register(cli: click.Group):
     cvat_group.add_command(nuc_cyto)
     cvat_group.add_command(nuc_cyto_legacy)
     cvat_group.add_command(export_annotations)
+    cvat_group.add_command(analyze_survival_legacy)
