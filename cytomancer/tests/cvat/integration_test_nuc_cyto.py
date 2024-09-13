@@ -40,7 +40,7 @@ def make_synthetic_nuc_cyto_data(gfp_nuc_i: int = 64, gfp_cyto_i: int = 32, dapi
 
 def upload_synthetic_nuc_cyto_data(output_dir: Path):
     experiment = make_synthetic_nuc_cyto_data()
-    task_df = do_upload("synthetic_nuc_cyto", experiment, ["GFP", "DAPI"], [], [], False, "none", ["channel", "x", "y"], 0, False)
+    task_df = do_upload("synthetic_nuc_cyto", experiment, ["GFP", "DAPI"], [], [], [], False, "none", ["channel", "x", "y"], 0, False)
     zarr_output = output_dir / "synthetic_nuc_cyto.zarr"
     ds = xr.Dataset(dict(intensity=experiment))
     ds.to_zarr(zarr_output, mode="w")
