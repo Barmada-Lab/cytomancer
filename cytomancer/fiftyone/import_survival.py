@@ -23,7 +23,7 @@ def add_detection_results(sample: fo.Sample, labels: np.ndarray, preds: np.ndarr
     return sample
 
 
-def import_survival_results(dataset: fo.Dataset, survival_results: xr.Dataset):
+def import_survival(dataset: fo.Dataset, survival_results: xr.Dataset):
     n_samples = survival_results.sizes["region"] * survival_results.sizes["field"] * survival_results.sizes["time"]
     for frame in tqdm(iter_idx_prod(survival_results, subarr_dims=["y", "x"]), total=n_samples):
         selector = {coord: frame[coord].values.tolist() for coord in frame.coords}
@@ -34,7 +34,7 @@ def import_survival_results(dataset: fo.Dataset, survival_results: xr.Dataset):
             add_detection_results(match, labels, preds).save()
 
 
-def do_import_survival_results(experiment_dir: Path, dataset_name: str):
+def do_import_survival(experiment_dir: Path, dataset_name: str):
     dataset = fo.load_dataset(dataset_name)
     survival_results = xr.open_zarr(experiment_dir / "results" / "survival_processed.zarr")
-    import_survival_results(dataset, survival_results)
+    import_survival(dataset, survival_results)

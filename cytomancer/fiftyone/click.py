@@ -12,6 +12,7 @@ from cytomancer.experiment import ExperimentType
 from .import_survival import do_import_survival_results
 from .ingest import do_ingest_cq1
 from .zhuzh import zhuzh
+from .import_survival import do_import_survival
 
 
 @click.command("launch-app")
@@ -55,11 +56,10 @@ def ingest(experiment_dir: Path, experiment_type: ExperimentType, name: str, reg
 
 @click.command("import-survival")
 @experiment_dir_argument()
-@click.option("--dataset-name", default="", help="Name of the dataset to import to; defaults to the name of experiment_dir")
-def import_survival(experiment_dir: Path, dataset_name: str) -> None:
-    if dataset_name == "":
-        dataset_name = experiment_dir.name
-    do_import_survival_results(experiment_dir, dataset_name)
+@click.option("--name", default="", help="Name of the importing fiftyone dataset; defaults to the name of experiment_dir")
+def import_survival(experiment_dir: Path, name: str) -> None:
+    name = name if name else experiment_dir.name
+    do_import_survival(experiment_dir, name)
 
 
 @click.command("zhuzh", help=inspect.getdoc(zhuzh))
