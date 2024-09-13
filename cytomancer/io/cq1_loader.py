@@ -132,7 +132,7 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
     holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index().replace({np.nan: None})
 
     return holy_df, shape, attrs
-    
+
 
 def tablefmt(d: dict, title: str | None = None) -> str:
     fmtd = "" if title is None else f"{title}:\n--------\n"
@@ -211,7 +211,7 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
     example_regions = list(regions.values())[0]
     if not all(r == example_regions for r in regions.values()):
         raise ValueError(f"Regions are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(regions)}")
-    
+
     fields = {acq[1].parent.name: set(df.index.get_level_values("field")) for acq, df in zip(dt_paths, dfs)}
     example_fields = list(fields.values())[0]
     if not all(f == example_fields for f in fields.values()):

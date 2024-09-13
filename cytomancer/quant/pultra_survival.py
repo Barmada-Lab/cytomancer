@@ -1,11 +1,8 @@
 from pathlib import Path
 import logging
-import os
 
 from sklearn.pipeline import Pipeline
 from skimage.measure import regionprops
-from skimage.exposure import rescale_intensity
-from skimage import filters, exposure, morphology  # type: ignore
 from dask.distributed import Worker, get_client
 import xarray as xr
 import pandas as pd

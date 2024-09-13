@@ -13,7 +13,6 @@ import tifffile
 
 from cytomancer.io.cq1_loader import get_experiment_df_detailed
 from cytomancer.io.cyto_dir import CytoMeta
-from cytomancer.dask import dask_client
 
 logger = logging.getLogger(__name__)
 
