@@ -39,6 +39,7 @@ def load_nd2(path: pl.Path) -> xr.DataArray:
     if "Z" in arr.dims:
         rename_dict["Z"] = "z"
     arr = arr.rename(rename_dict)
+    arr.attrs = {}
     return arr
 
 
