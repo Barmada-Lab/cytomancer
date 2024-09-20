@@ -7,7 +7,7 @@ import nd2
 
 def load_nd2(path: pl.Path) -> xr.DataArray:
 
-    arr = nd2.imread(path, xarray=True)
+    arr = nd2.imread(path, xarray=True, dask=True)
     nd2_label = path.name.replace(".nd2", "")
     arr = arr.expand_dims("region").assign_coords({"region": [nd2_label]})
 
@@ -39,7 +39,6 @@ def load_nd2(path: pl.Path) -> xr.DataArray:
     if "Z" in arr.dims:
         rename_dict["Z"] = "z"
     arr = arr.rename(rename_dict)
-
     return arr
 
 
@@ -50,7 +49,6 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
 
     arrs = []
     for path in paths:
-
         nd2 = load_nd2(path)
         arrs.append(nd2)
 
