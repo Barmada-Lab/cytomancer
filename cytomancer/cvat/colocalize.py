@@ -2,6 +2,7 @@ from itertools import product
 from collections import defaultdict
 from pathlib import Path
 import logging
+import atexit
 import shutil
 
 from pycocotools.coco import COCO
@@ -120,17 +121,14 @@ def do_nuc_cyto(  # noqa: C901
         nuc_label: str,
         soma_label: str):
 
+    logger.info("Reading experiment directory...")
+    experiment = load_experiment(experiment_dir, experiment_type)
+
+    logger.info("Caching experiment as zarray... this may take a few minutes.")
     exp_cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
-    if not exp_cache_dir.exists():
-        try:
-            logger.info("Caching experiment as zarray... this may take a few minutes.")
-            intensity = load_experiment(experiment_dir, experiment_type)
-            intensity.attrs = {}
-            ds = xr.Dataset(dict(intensity=intensity))
-            ds.to_zarr(exp_cache_dir, mode="w")
-        except Exception as e:
-            logger.error(f"Failed to cache experiment! {e}")
-            shutil.rmtree(exp_cache_dir, ignore_errors=True)
+    atexit.register(lambda: shutil.rmtree(exp_cache_dir, ignore_errors=True))
+    ds = xr.Dataset(dict(intensity=experiment))
+    ds.to_zarr(exp_cache_dir, mode="w")
 
     intensity = xr.open_zarr(exp_cache_dir).intensity
 

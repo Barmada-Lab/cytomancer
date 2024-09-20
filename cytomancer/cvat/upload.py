@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 import tempfile
+import atexit
 import shutil
 import uuid
 
@@ -147,22 +148,16 @@ def upload_experiment(
     if project_name == "":
         project_name = experiment_dir.name
 
-    cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
-    if not cache_dir.exists():
-        try:
-            logger.info("Caching experiment as zarray... this may take a few minutes.")
-            experiment = load_experiment(experiment_dir, experiment_type)
-            ds = xr.Dataset(dict(intensity=experiment))
-            ds.to_zarr(cache_dir, mode="w")
-        except Exception as e:
-            logger.error(f"Failed to cache experiment! {e}")
-            shutil.rmtree(cache_dir, ignore_errors=True)
+    logger.info("Reading experiment directory...")
+    experiment = load_experiment(experiment_dir, experiment_type)
 
-    try:
-        experiment = xr.open_zarr(cache_dir).intensity
-    except Exception as e:
-        logger.error(f"Failed to open cached experiment at {cache_dir}! Delete the cached copy and try again.\n{e}")
-        return
+    logger.info("Caching experiment as zarray... this may take a few minutes.")
+    cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
+    atexit.register(lambda: shutil.rmtree(cache_dir, ignore_errors=True))
+    ds = xr.Dataset(dict(intensity=experiment))
+    ds.to_zarr(cache_dir, mode="w")
+
+    experiment = xr.open_zarr(cache_dir).intensity
 
     channels_list = channels.split(",") if channels else []
     fields_list = fields.split(",") if fields else []
