@@ -86,7 +86,7 @@ def do_upload(  # noqa: C901
         experiment = experiment.sel(field=fields)
 
     if len(tps) > 0:
-        experiment = experiment.isel(time=list(map(int, tps)))
+        experiment = experiment.isel(time=list(map(lambda x: int(x) - 1, tps)))
 
     match projection:
         case "sum":
