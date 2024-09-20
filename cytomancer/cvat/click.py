@@ -44,7 +44,7 @@ def auth(cvat_username, cvat_password):
 @click.option("--clahe-clip", type=float, default=0.00,
               help="""Clip limit for contrast limited adaptive histogram equalization. Enhances
               contrast for easier annotation of dim structures, but may misrepresent relative
-              intensities within each field. Set above 0 to enable. """)
+              intensities within each field. Set above 0 to enable. (recommended 0.01-0.05) """)
 @click.option("--blind", is_flag=True, default=False, help="Remove identifying metadata from task names and shuffle upload order")
 def upload_experiment(*args, **kwargs):
     from .upload import upload_experiment as upload_experiment_impl
