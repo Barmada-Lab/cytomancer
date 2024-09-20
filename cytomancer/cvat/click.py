@@ -3,7 +3,6 @@ from pathlib import Path
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
-from cytomancer.dask import dask_client
 from .nuc_cyto_legacy import cli_entry as nuc_cyto_legacy
 from .legacy_survival import cli_entry as analyze_survival_legacy
 from .measure import measure_experiment, measurement_fn_lut
@@ -48,8 +47,7 @@ def auth(cvat_username, cvat_password):
 @click.option("--blind", is_flag=True, default=False, help="Remove identifying metadata from task names and shuffle upload order")
 def upload_experiment(*args, **kwargs):
     from .upload import upload_experiment as upload_experiment_impl
-    with dask_client():
-        upload_experiment_impl(*args, **kwargs)
+    upload_experiment_impl(*args, **kwargs)
 
 
 @click.command("measure")
