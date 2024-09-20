@@ -7,7 +7,7 @@ import nd2
 
 def load_nd2(path: pl.Path) -> xr.DataArray:
 
-    arr = nd2.imread(path, xarray=True, dask=True)
+    arr = nd2.imread(path, xarray=True, dask=True, validate_frames=True)
     nd2_label = path.name.replace(".nd2", "")
     arr = arr.expand_dims("region").assign_coords({"region": [nd2_label]})
 
