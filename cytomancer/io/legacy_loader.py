@@ -15,7 +15,7 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
         channel_tags.add(path.parent.parent.parent.name)
         region, field = path.name.split(".")[0].split("_")
         region_tags.add(region)
-        field_tags.add(str(int(field)))  # get rid of zero-padding
+        field_tags.add(field)  # get rid of zero-padding
 
     region_tags = sorted(region_tags)
     channel_tags = sorted(channel_tags)
@@ -48,7 +48,7 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
             "channel": channel_tags,
             "time": timepoint_tags,
             "region": region_tags,
-            "field": field_tags,
+            "field": [str(int(field)) for field in field_tags],
         }
     )
 
@@ -67,7 +67,7 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
         channel_tags.add(path.parent.parent.parent.name)
         region, field = path.name.split(".")[0].split("_")
         region_tags.add(region)
-        field_tags.add(str(int(field)))  # get rid of zero-padding
+        field_tags.add(field)  # get rid of zero-padding
 
     region_tags = sorted(region_tags)
     channel_tags = sorted(channel_tags)
@@ -100,7 +100,7 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
             "channel": channel_tags,
             "time": [0],
             "region": list(map(str, timepoint_tags)),
-            "field": field_tags,
+            "field": [str(int(field)) for field in field_tags],
         }
     ).squeeze("time", drop=True)
 
