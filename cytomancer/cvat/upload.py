@@ -33,8 +33,11 @@ def stage_task(arr: xr.DataArray, tmpdir: Path, blind: bool):
     task_name = str(uuid.uuid4()) if blind else f"{region_name}_{uuid.uuid4()}"
     coords, files = [], []
     subarr_dims = ["y", "x", "rgb"] if "rgb" in arr.dims else ["y", "x"]
-    for idx, frame in enumerate(iter_idx_prod(arr, subarr_dims=subarr_dims)):
-        tmpfile = tmpdir / f"{task_name}_{idx}.tif"
+    frames = list(iter_idx_prod(arr, subarr_dims=subarr_dims))
+    n_pad = len(str(len(frames)))
+    for idx, frame in enumerate(frames):
+        padded_idx = str(idx).zfill(n_pad)
+        tmpfile = tmpdir / f"{task_name}_{padded_idx}.tif"
         tifffile.imwrite(tmpfile, frame.data)
         coords.append(frame.coords)
         files.append(tmpfile)
