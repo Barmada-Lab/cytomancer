@@ -126,6 +126,7 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
     ts = df["timepoint"].unique().size
     acq_delta = acquisition_delta / ts
     df["time"] = df["timepoint"].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
+    df.drop("timepoint", axis=1, inplace=True)
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
     holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
