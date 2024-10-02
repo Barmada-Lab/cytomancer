@@ -1,6 +1,9 @@
+from itertools import groupby
 import time
 
 from cvat_sdk import Client, Config
+from skimage.measure import regionprops
+import numpy as np
 
 from cytomancer.config import CytomancerConfig
 
@@ -51,6 +54,25 @@ def test_cvat_credentials(cvat_url, cvat_username, cvat_password):
     except ApiException as e:
         print(f"Error: {e.body}")
         return False
+
+
+def _mask_to_rle(mask: np.ndarray) -> list[int]:
+    counts = []
+    for i, (value, elements) in enumerate(groupby(mask.flatten())):
+        if i == 0 and value == 1:
+            counts.append(0)
+        counts.append(len(list(elements)))
+    return counts
+
+
+def get_rles(labelled_arr: np.ndarray):
+    for props in regionprops(labelled_arr):
+        id = props.label
+        mask = labelled_arr == id
+        top, left, bottom, right = props.bbox
+        rle = _mask_to_rle(mask[top:bottom, left:right])
+        rle += [left, top, right-1, bottom-1]
+        yield (id, rle)
 
 
 def create_project(client: Client, project_name: str):

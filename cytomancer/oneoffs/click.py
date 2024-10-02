@@ -26,8 +26,8 @@ def stardist_seg_cvat_proj(
         model_name: str):
 
     """ Segment images in a CVAT project using StarDist. """
-    from cytomancer.oneoffs.tasks import stardist_seg_cvat_proj_run
-    stardist_seg_cvat_proj_run.delay(
+    from cytomancer.oneoffs.stardist_seg_cvat_proj import run
+    run(
         project_name,
         experiment_dir,
         experiment_type,
