@@ -43,9 +43,8 @@ def train_pultra_classifier(cvat_project_name, experiment_dir: Path, experiment_
     """
     Train a classifier for pultra survival analysis.
     """
-    intensity_arr = load_experiment(experiment_dir, experiment_type)
-    from cytomancer.quant.pultra_classifier import train
-    classifier = train(cvat_project_name, live_label, intensity_arr, min_dapi_snr)
+    from cytomancer.quant.pultra_classifier import do_train
+    classifier = do_train(cvat_project_name, experiment_dir, experiment_type, live_label, min_dapi_snr)
     if classifier is not None:
         joblib.dump(classifier, output_path)
         logger.info(f"Saved classifier to {output_path}")
