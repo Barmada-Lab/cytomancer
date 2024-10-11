@@ -80,4 +80,4 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
 
         homogenized.append(resized)
 
-    return xr.concat(homogenized, dim="region").assign_coords({"region": regions})
+    return xr.concat(homogenized, dim="region").assign_coords({"region": regions}).drop_vars(["z", "y", "x"])

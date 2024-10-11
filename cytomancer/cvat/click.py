@@ -55,7 +55,7 @@ def upload_experiment(*args, **kwargs):
 @experiment_type_argument()
 @click.option("--roi-set-name", type=str, default="cvat_instances_default.json", help="Name of the ROI set to measure")
 @click.option("--measurements", type=click.Choice(list(measurement_fn_lut.keys())), multiple=True, help="Measurements to perform on each ROI")
-@click.option("--z-projection-mode", type=click.Choice(["none", "sum", "mip"]), default="none", help="Method for z-projection")
+@click.option("--z-projection-mode", type=click.Choice(["none", "sum", "maximum_intensity"]), default="none", help="Method for z-projection")
 @click.option("--roi-broadcasting", type=click.Choice(["channel", "z", "time"]), multiple=True, help="Broadcasting mode for ROIs")
 def measure(experiment_dir, experiment_type, roi_set_name, measurements, z_projection_mode, roi_broadcasting):
     measure_experiment(
