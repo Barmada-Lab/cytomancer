@@ -108,7 +108,7 @@ def measure_experiment(  # noqa: C901
     if (not_supported := set(roi_broadcasting) - broadcast_modes):
         raise ValueError(f"Invalid broadcast mode: {not_supported}")
 
-    if z_projection_mode not in ["none", "max", "sum"]:
+    if z_projection_mode not in ["none", "maximum_intensity", "sum"]:
         raise ValueError(f"Invalid intensity projection: {z_projection_mode}")
 
     logger.info("Reading experiment directory...")
@@ -125,7 +125,7 @@ def measure_experiment(  # noqa: C901
     match z_projection_mode:
         case "none":
             pass
-        case "mip":
+        case "maximum_intensity":
             intensity = intensity.max("z")
         case "sum":
             intensity = intensity.sum("z")
