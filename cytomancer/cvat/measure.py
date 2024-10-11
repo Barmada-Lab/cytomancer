@@ -138,7 +138,10 @@ def measure_experiment(  # noqa: C901
         raise FileNotFoundError(f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?")
 
     dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
-    task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"]).set_index("frame")
+    try:
+        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"]).set_index("frame")
+    except ValueError:
+        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec).set_index("frame")
 
     annotations_location = experiment_dir / "results" / "annotations" / roi_set_name
     if not annotations_location.exists():
