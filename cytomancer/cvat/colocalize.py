@@ -118,6 +118,7 @@ def do_nuc_cyto(  # noqa: C901
         experiment_dir: Path,
         experiment_type: ExperimentType,
         roi_set_name: str,
+        z_projection_mode: str,
         nuc_label: str,
         soma_label: str):
 
@@ -131,6 +132,14 @@ def do_nuc_cyto(  # noqa: C901
     ds.to_zarr(exp_cache_dir, mode="w")
 
     intensity = xr.open_zarr(exp_cache_dir).intensity
+
+    match z_projection_mode:
+        case "none":
+            pass
+        case "maximum_intensity":
+            intensity = intensity.max("z")
+        case "sum":
+            intensity = intensity.sum("z")
 
     upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
     if not upload_record_location.exists():

@@ -71,11 +71,12 @@ def measure(experiment_dir, experiment_type, roi_set_name, measurements, z_proje
 @experiment_dir_argument()
 @experiment_type_argument()
 @click.option("--roi-set-name", type=str, default="cvat_instances_default.json", help="Name of the ROI set to measure")
+@click.option("--z-projection-mode", type=click.Choice(["none", "sum", "maximum_intensity"]), default="none", help="Method for z-projection")
 @click.option("--nuc-label", type=str, default="nucleus", help="Name of the nucleus label in the ROI set")
 @click.option("--soma-label", type=str, default="soma", help="Name of the soma label in the ROI set")
-def nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label):
+def nuc_cyto(experiment_dir, experiment_type, roi_set_name, z_projection_mode, nuc_label, soma_label):
     from .colocalize import do_nuc_cyto
-    do_nuc_cyto(experiment_dir, experiment_type, roi_set_name, nuc_label, soma_label)
+    do_nuc_cyto(experiment_dir, experiment_type, roi_set_name, z_projection_mode, nuc_label, soma_label)
 
 
 @click.command("export")
