@@ -7,19 +7,19 @@ SCRATCH=/scratch/sbarmada_root/sbarmada0/$USER
 
 if [ ! -e $HOME/turbo ]; then
     ln -s $TURBO $HOME/turbo
-fi    
+fi
 
 if [ ! -e $HOME/scratch ]; then
     ln -s $SCRATCH $HOME/scratch
-fi    
+fi
 
 if [ ! -e $HOME/Desktop/turbo ]; then
     ln -s $TURBO $HOME/Desktop/turbo
-fi    
+fi
 
 if [ ! -e $HOME/Desktop/scratch ]; then
     ln -s $SCRATCH $HOME/Desktop/scratch
-fi    
+fi
 
 if [ ! -e $HOME/Desktop/ImageJ2.desktop ]; then
     cp $TURBO/shared/Fiji.app/ImageJ2.desktop $HOME/Desktop

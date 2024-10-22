@@ -29,4 +29,3 @@ You can launch a Terminal User Interface (TUI) session by running:
 Alternatively, you can invoke any command listed in the tui directly from your shell. For information about the commands available, run:
 
     cyto --help
-

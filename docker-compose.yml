@@ -6,7 +6,7 @@ services:
       - "6379:6379"
 
   worker:
-    build: 
+    build:
       context: .
       dockerfile: components/worker/Dockerfile
     depends_on:
@@ -25,9 +25,9 @@ services:
           memory: 116G
 
   monitor:
-    image: mher/flower 
+    image: mher/flower
     depends_on:
       - queue
     command: celery --broker redis://queue:6379 flower
-    ports: 
+    ports:
       - "5555:5555"
