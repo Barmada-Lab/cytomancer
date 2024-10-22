@@ -135,7 +135,8 @@ def do_train(
         experiment_dir: Path,
         experiment_type: ExperimentType,
         live_label: str,
-        min_dapi_snr: float | None = None) -> Pipeline | None:
+        min_dapi_snr: float | None = None,
+        dump_predictions: bool = False) -> Pipeline | None:
 
     client = new_client_from_config(config)
     intensity = load_experiment(experiment_dir, experiment_type)
@@ -174,6 +175,12 @@ def do_train(
     pipe.fit(X_train, y_train)
     score = pipe.score(X_test, y_test, scoring="accuracy")  # type: ignore
     logger.info(f"Pipeline score: {score}")
+
+    if dump_predictions:
+        eval_path = experiment_dir / "results" / "classifier_eval.csv"
+        X["prediction"] = pipe.predict(X)
+        X["ground_truth"] = y
+        X.to_csv(eval_path)
 
     return pipe
 

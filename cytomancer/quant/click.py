@@ -39,12 +39,13 @@ def pultra_survival(experiment_dir: Path, classifier_name, save_annotations: boo
 @click.argument("output_path", type=click.Path(exists=False, file_okay=True, dir_okay=False, writable=True))
 @click.argument("live_label", type=str)
 @click.option("--min-dapi-snr", type=float, default=2, help="Minimum DAPI signal-to-noise ratio to include in training data.")
-def train_pultra_classifier(cvat_project_name, experiment_dir: Path, experiment_type: ExperimentType, output_path: Path, live_label: str, min_dapi_snr: float):
+@click.option("--dump-predictions", is_flag=True, help="Dump predictions to disk for debugging.")
+def train_pultra_classifier(cvat_project_name, experiment_dir: Path, experiment_type: ExperimentType, output_path: Path, live_label: str, min_dapi_snr: float, dump_predictions: bool):
     """
     Train a classifier for pultra survival analysis.
     """
     from cytomancer.quant.pultra_classifier import do_train
-    classifier = do_train(cvat_project_name, experiment_dir, experiment_type, live_label, min_dapi_snr)
+    classifier = do_train(cvat_project_name, experiment_dir, experiment_type, live_label, min_dapi_snr, dump_predictions)
     if classifier is not None:
         joblib.dump(classifier, output_path)
         logger.info(f"Saved classifier to {output_path}")
