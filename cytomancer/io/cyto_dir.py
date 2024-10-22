@@ -1,15 +1,14 @@
-from dataclasses import dataclass, asdict
-from pathlib import Path
-import logging
 import json
+import logging
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
-import xarray as xr
-import pandas as pd
-import numpy as np
-import dask.array as da
-import tifffile
 import dask
-
+import dask.array as da
+import numpy as np
+import pandas as pd
+import tifffile
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +37,16 @@ def _get_experiment_df(csv_path: Path):
     df["time"] = pd.to_datetime(df["time"])
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
-    holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
-    holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index().replace({np.nan: None})
+    holy_mi = pd.MultiIndex.from_product(
+        preliminary_mi.levels, names=preliminary_mi.names
+    )
+    holy_df = (
+        df[["path"]]
+        .set_index(preliminary_mi)
+        .reindex(index=holy_mi)
+        .sort_index()
+        .replace({np.nan: None})
+    )
 
     return holy_df
 
@@ -51,14 +58,17 @@ def _get_experiment_meta(meta_path: Path):
 
 
 def _load_df(df, meta: CytoMeta):
-
     def read_img(path):
         logger.debug(f"Reading {path}")
         if path is None:
-            logger.warning("MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs...")
+            logger.warning(
+                "MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs..."
+            )
             return np.full(meta.shape, np.nan)
         elif not path.exists():
-            logger.warning(f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs...")
+            logger.warning(
+                f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs..."
+            )
             return np.full(meta.shape, np.nan)
         return tifffile.imread(path).astype(meta.dtype)
 
@@ -69,7 +79,9 @@ def _load_df(df, meta: CytoMeta):
         """
         if type(recurrence) is pd.Series:
             path = recurrence["path"]
-            return da.from_delayed(dask.delayed(read_img)(path), meta.shape, dtype=meta.dtype)
+            return da.from_delayed(
+                dask.delayed(read_img)(path), meta.shape, dtype=meta.dtype
+            )
         else:  # type(recurrence) is pd.DataFrame
             if type(recurrence.index) is pd.MultiIndex:
                 level = recurrence.index.levels[0]  # type: ignore
@@ -82,7 +94,8 @@ def _load_df(df, meta: CytoMeta):
     arr = xr.DataArray(
         arr,
         dims=labels + ["y", "x"],
-        coords=dict((label, val) for label, val in zip(labels, df.index.levels)))  # type: ignore
+        coords=dict(zip(labels, df.index.levels, strict=False)),
+    )  # type: ignore
 
     arr.coords["channel"] = arr.coords["channel"].astype(str)
     arr.coords["region"] = arr.coords["region"].astype(str)
@@ -93,8 +106,9 @@ def _load_df(df, meta: CytoMeta):
     return arr
 
 
-def load_dir(img_dir: Path, summary_csv: Path | None = None, meta_json: Path | None = None):
-
+def load_dir(
+    img_dir: Path, summary_csv: Path | None = None, meta_json: Path | None = None
+):
     if summary_csv is None:
         summary_csv = img_dir / SUMMARY_CSV
 

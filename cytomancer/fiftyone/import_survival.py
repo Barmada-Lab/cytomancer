@@ -1,14 +1,14 @@
-import xarray as xr
+from pathlib import Path
+
 import fiftyone as fo
 import numpy as np
-from pathlib import Path
+import xarray as xr
 from pandas import Timestamp
+from skimage.measure import regionprops
 from tqdm import tqdm
 
-from skimage.measure import regionprops
-
-from cytomancer.utils import iter_idx_prod
 from cytomancer.quant.pultra_survival import LIVE
+from cytomancer.utils import iter_idx_prod
 
 
 def add_detection_results(sample: fo.Sample, labels: np.ndarray, preds: np.ndarray):
@@ -24,8 +24,14 @@ def add_detection_results(sample: fo.Sample, labels: np.ndarray, preds: np.ndarr
 
 
 def import_survival(dataset: fo.Dataset, survival_results: xr.Dataset):
-    n_samples = survival_results.sizes["region"] * survival_results.sizes["field"] * survival_results.sizes["time"]
-    for frame in tqdm(iter_idx_prod(survival_results, subarr_dims=["y", "x"]), total=n_samples):
+    n_samples = (
+        survival_results.sizes["region"]
+        * survival_results.sizes["field"]
+        * survival_results.sizes["time"]
+    )
+    for frame in tqdm(
+        iter_idx_prod(survival_results, subarr_dims=["y", "x"]), total=n_samples
+    ):
         selector = {coord: frame[coord].values.tolist() for coord in frame.coords}
         selector["time"] = Timestamp(selector["time"], unit="ns")
         preds = frame["preds"].values
@@ -36,5 +42,7 @@ def import_survival(dataset: fo.Dataset, survival_results: xr.Dataset):
 
 def do_import_survival(experiment_dir: Path, dataset_name: str):
     dataset = fo.load_dataset(dataset_name)
-    survival_results = xr.open_zarr(experiment_dir / "results" / "survival_processed.zarr")
+    survival_results = xr.open_zarr(
+        experiment_dir / "results" / "survival_processed.zarr"
+    )
     import_survival(dataset, survival_results)

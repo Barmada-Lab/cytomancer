@@ -7,7 +7,9 @@ from . import ioutils
 
 
 def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
-    timepoint_tags = sorted({int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*/*")})
+    timepoint_tags = sorted(
+        {int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*/*")}
+    )
     region_tags = set()
     field_tags = set()
     channel_tags = set()
@@ -33,7 +35,14 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
                 fields = []
                 for field in field_tags:
                     col = region[1:]
-                    path = base / "raw_imgs" / channel / f"T{timepoint}" / f"col_{col}" / f"{region}_{field}.tif"
+                    path = (
+                        base
+                        / "raw_imgs"
+                        / channel
+                        / f"T{timepoint}"
+                        / f"col_{col}"
+                        / f"{region}_{field}.tif"
+                    )
                     img = ioutils.read_tiff_toarray(path)
                     fields.append(img)
                 regions.append(da.stack(fields))
@@ -49,7 +58,7 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
             "time": timepoint_tags,
             "region": region_tags,
             "field": [str(int(field)) for field in field_tags],
-        }
+        },
     )
 
     if fillna:
@@ -59,7 +68,9 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
 
 
 def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
-    timepoint_tags = sorted({int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*/*")})
+    timepoint_tags = sorted(
+        {int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*/*")}
+    )
     region_tags = set()
     field_tags = set()
     channel_tags = set()
@@ -85,7 +96,14 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
                 fields = []
                 for field in field_tags:
                     col = region[1:]
-                    path = base / "raw_imgs" / channel / f"T{timepoint}" / f"col_{col}" / f"{region}_{field}.tif"
+                    path = (
+                        base
+                        / "raw_imgs"
+                        / channel
+                        / f"T{timepoint}"
+                        / f"col_{col}"
+                        / f"{region}_{field}.tif"
+                    )
                     img = ioutils.read_tiff_toarray(path)
                     fields.append(img)
                 regions.append(da.stack(fields))
@@ -101,7 +119,7 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
             "time": [0],
             "region": list(map(str, timepoint_tags)),
             "field": [str(int(field)) for field in field_tags],
-        }
+        },
     ).squeeze("time", drop=True)
 
     if fillna:

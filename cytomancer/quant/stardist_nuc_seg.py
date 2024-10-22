@@ -1,15 +1,15 @@
+import logging
 from pathlib import Path
 from uuid import uuid4
-import logging
 
-from distributed import get_client, wait
-from stardist.models import StarDist2D
-from skimage.exposure import equalize_adapthist, rescale_intensity
-from skimage.morphology import disk
-from skimage.filters import rank
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tifffile
+from distributed import get_client, wait
+from skimage.exposure import equalize_adapthist, rescale_intensity
+from skimage.filters import rank
+from skimage.morphology import disk
+from stardist.models import StarDist2D
 
 from cytomancer.io.cq1_loader import get_experiment_df_detailed
 from cytomancer.io.cyto_dir import CytoMeta
@@ -17,7 +17,11 @@ from cytomancer.io.cyto_dir import CytoMeta
 logger = logging.getLogger(__name__)
 
 
-def run(experiment_dir: Path, model_name: str = "2D_versatile_fluo", clahe_clip: float = 0.01):  # noqa: C901
+def run(
+    experiment_dir: Path,
+    model_name: str = "2D_versatile_fluo",
+    clahe_clip: float = 0.01,
+):  # noqa: C901
     """
     Run StarDist nuclear segmentation on a DataFrame of images.
 
@@ -35,7 +39,9 @@ def run(experiment_dir: Path, model_name: str = "2D_versatile_fluo", clahe_clip:
     pd.DataFrame
         DataFrame with segmentation results.
     """
-    assert experiment_dir.exists(), f"Could not find experiment directory at {experiment_dir}"
+    assert (
+        experiment_dir.exists()
+    ), f"Could not find experiment directory at {experiment_dir}"
 
     results_subdir = experiment_dir / "results" / "stardist_nuc_seg"
     results_subdir.mkdir(parents=True, exist_ok=True)
@@ -49,12 +55,15 @@ def run(experiment_dir: Path, model_name: str = "2D_versatile_fluo", clahe_clip:
     client = get_client()
 
     def load_and_preprocess(path):
-
         if path is None:
-            logger.warning("MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs...")
+            logger.warning(
+                "MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs..."
+            )
             return np.full((1, 1), np.nan)
         elif not path.exists():
-            logger.warning(f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs...")
+            logger.warning(
+                f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs..."
+            )
             return np.full((1, 1), np.nan)
         image = tifffile.imread(path).astype(np.float16)[:1998, :1998]
 
@@ -92,7 +101,9 @@ def run(experiment_dir: Path, model_name: str = "2D_versatile_fluo", clahe_clip:
             summary.append(row_vals)
 
     row_keys = df.columns.tolist()
-    summary_records = [dict(zip(row_keys, row_vals)) for row_vals in summary]
+    summary_records = [
+        dict(zip(row_keys, row_vals, strict=False)) for row_vals in summary
+    ]
     output_df = pd.DataFrame.from_records(summary_records)
     output_df.to_csv(results_subdir / "summary.csv", index=False)
     CytoMeta(shape, "uint16").dump_json(results_subdir / "meta.json")

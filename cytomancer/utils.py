@@ -1,20 +1,23 @@
-from itertools import product
-from typing import TypeVar, Generator
 import pathlib as pl
 import random
+from collections.abc import Generator
+from itertools import product
+from typing import TypeVar
 
 import xarray as xr
 
-from cytomancer.io.legacy_loader import load_legacy, load_legacy_icc
-from cytomancer.io.nd2_loader import load_nd2_collection
-from cytomancer.io.lux_loader import load_lux
-from cytomancer.io.cq1_loader import load_cq1
 from cytomancer.experiment import ExperimentType
+from cytomancer.io.cq1_loader import load_cq1
+from cytomancer.io.legacy_loader import load_legacy, load_legacy_icc
+from cytomancer.io.lux_loader import load_lux
+from cytomancer.io.nd2_loader import load_nd2_collection
 
 T = TypeVar("T", xr.DataArray, xr.Dataset)
 
 
-def load_experiment(path: pl.Path, experiment_type: ExperimentType, fillna: bool = False) -> xr.DataArray:
+def load_experiment(
+    path: pl.Path, experiment_type: ExperimentType, fillna: bool = False
+) -> xr.DataArray:
     match experiment_type:
         case ExperimentType.LEGACY:
             return load_legacy(path, fillna)
@@ -28,11 +31,9 @@ def load_experiment(path: pl.Path, experiment_type: ExperimentType, fillna: bool
             return load_cq1(path)
 
 
-def apply_ufunc_xy(
-        func,
-        arr: xr.DataArray,
-        ufunc_kwargs={},
-        **kwargs):
+def apply_ufunc_xy(func, arr: xr.DataArray, ufunc_kwargs=None, **kwargs):
+    if ufunc_kwargs is None:
+        ufunc_kwargs = {}
     return xr.apply_ufunc(
         func,
         arr,
@@ -41,20 +42,23 @@ def apply_ufunc_xy(
         dask="parallelized",
         vectorize=True,
         kwargs=ufunc_kwargs,
-        **kwargs)
+        **kwargs,
+    )
 
 
-def iter_idx_prod(arr: T, subarr_dims=[], shuffle=False) -> Generator[T, None, None]:
+def iter_idx_prod(arr: T, subarr_dims=None, shuffle=False) -> Generator[T, None, None]:
     """
     Iterates over the product of an array's indices. Can be used to iterate over
     all the (coordinate-less) XY(Z) planes in an experiment.
     """
+    if subarr_dims is None:
+        subarr_dims = []
     indices = [name for name in arr.indexes if name not in subarr_dims]
     idxs = list(product(*[arr.indexes[name] for name in indices]))
     if shuffle:
         random.shuffle(idxs)
     for coords in idxs:
-        selector = dict(zip(indices, coords))
+        selector = dict(zip(indices, coords, strict=False))
         yield arr.sel(selector)
 
 

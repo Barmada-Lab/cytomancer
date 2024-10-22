@@ -1,13 +1,12 @@
 from celery import Celery, Task
 from celery.utils.log import get_task_logger
-from cytomancer.config import config
 
+from cytomancer.config import config
 
 logger = get_task_logger(__name__)
 
 
 class CytomancerTask(Task):
-
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         pass
 
@@ -15,10 +14,13 @@ class CytomancerTask(Task):
         pass
 
 
-app = Celery('cytomancer',
-             broker=config.celery_broker_url,
-             broker_connection_retry_on_startup=True,
-             task_cls=CytomancerTask,
-             include=[
-                 'cytomancer.quant.tasks',
-                 'cytomancer.oneoffs.tasks',])
+app = Celery(
+    "cytomancer",
+    broker=config.celery_broker_url,
+    broker_connection_retry_on_startup=True,
+    task_cls=CytomancerTask,
+    include=[
+        "cytomancer.quant.tasks",
+        "cytomancer.oneoffs.tasks",
+    ],
+)

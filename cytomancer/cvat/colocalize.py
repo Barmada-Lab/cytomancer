@@ -1,18 +1,18 @@
-from itertools import product
-from collections import defaultdict
-from pathlib import Path
-import logging
 import atexit
+import logging
 import shutil
+from collections import defaultdict
+from itertools import product
+from pathlib import Path
 
-from pycocotools.coco import COCO
-import xarray as xr
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xarray as xr
+from pycocotools.coco import COCO
 
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment, iter_idx_prod
 from cytomancer.config import config
+from cytomancer.experiment import ExperimentType
+from cytomancer.utils import iter_idx_prod, load_experiment
 
 logger = logging.getLogger(__name__)
 
@@ -52,22 +52,29 @@ def group_rois(file_coords: pd.DataFrame, coco_set: COCO, variable_dims: list[st
     Groups coco annotations by their coordinates in file_coords, yielding tuples of
     coordinates and their corresponding annotations
     """
-    filename_to_anns = {coco_set.imgs[id]["file_name"]: anns for id, anns in coco_set.imgToAnns.items()}
+    filename_to_anns = {
+        coco_set.imgs[id]["file_name"]: anns for id, anns in coco_set.imgToAnns.items()
+    }
     stripped = file_coords.drop(columns=variable_dims)
-    coords = [coord for coord in stripped.columns if coord != 'frame']
+    coords = [coord for coord in stripped.columns if coord != "frame"]
     rois = stripped.groupby(coords)
     for roi_coords, df in rois:
-        annotations = sum(df["frame"].apply(lambda x: filename_to_anns[x] if x in filename_to_anns else []), [])
-        yield dict(zip(coords, roi_coords)), annotations
+        annotations = sum(
+            df["frame"].apply(
+                lambda x: filename_to_anns[x] if x in filename_to_anns else []
+            ),
+            [],
+        )
+        yield dict(zip(coords, roi_coords, strict=False)), annotations
 
 
 def nuc_cyto(
-        intensity: xr.DataArray,
-        task_df: pd.DataFrame,
-        annotations: COCO,
-        nuc_label: str,
-        soma_label: str):
-
+    intensity: xr.DataArray,
+    task_df: pd.DataFrame,
+    annotations: COCO,
+    nuc_label: str,
+    soma_label: str,
+):
     cat_map = {id: cat["name"] for id, cat in annotations.cats.items()}
 
     cell_id = 1
@@ -79,8 +86,16 @@ def nuc_cyto(
 
     measurements = []
     for coords, group in group_rois(task_df, annotations, ["channel"]):
-        nuc_masks = [annotations.annToMask(ann) == 1 for ann in group if cat_map[ann["category_id"]] == nuc_label]
-        soma_masks = [annotations.annToMask(ann) == 1 for ann in group if cat_map[ann["category_id"]] == soma_label]
+        nuc_masks = [
+            annotations.annToMask(ann) == 1
+            for ann in group
+            if cat_map[ann["category_id"]] == nuc_label
+        ]
+        soma_masks = [
+            annotations.annToMask(ann) == 1
+            for ann in group
+            if cat_map[ann["category_id"]] == soma_label
+        ]
 
         subarr = intensity.sel(coords).load()
 
@@ -105,7 +120,7 @@ def nuc_cyto(
                     "soma_std": soma_std,
                     "cyto_mean": cyto_mean,
                     "cyto_std": cyto_std,
-                    **frame_coords
+                    **frame_coords,
                 }
                 measurements.append(measurement)
 
@@ -115,20 +130,20 @@ def nuc_cyto(
 
 
 def do_nuc_cyto(  # noqa: C901
-        experiment_dir: Path,
-        experiment_type: ExperimentType,
-        roi_set_name: str,
-        z_projection_mode: str,
-        nuc_label: str,
-        soma_label: str):
-
+    experiment_dir: Path,
+    experiment_type: ExperimentType,
+    roi_set_name: str,
+    z_projection_mode: str,
+    nuc_label: str,
+    soma_label: str,
+):
     logger.info("Reading experiment directory...")
     experiment = load_experiment(experiment_dir, experiment_type)
 
     logger.info("Caching experiment as zarray... this may take a few minutes.")
     exp_cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
     atexit.register(lambda: shutil.rmtree(exp_cache_dir, ignore_errors=True))
-    ds = xr.Dataset(dict(intensity=experiment))
+    ds = xr.Dataset({"intensity": experiment})
     ds.to_zarr(exp_cache_dir, mode="w")
 
     intensity = xr.open_zarr(exp_cache_dir).intensity
@@ -143,17 +158,23 @@ def do_nuc_cyto(  # noqa: C901
 
     upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
     if not upload_record_location.exists():
-        raise FileNotFoundError(f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?")
+        raise FileNotFoundError(
+            f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?"
+        )
 
     dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
     try:
-        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"])
+        task_df = pd.read_csv(
+            upload_record_location, dtype=dtype_spec, parse_dates=["time"]
+        )
     except ValueError:
         task_df = pd.read_csv(upload_record_location, dtype=dtype_spec)
 
     annotations_location = experiment_dir / "results" / "annotations" / roi_set_name
     if not annotations_location.exists():
-        raise FileNotFoundError(f"Annotations not found at {annotations_location}! Export annotations with 'cyto cvat export' before measuring.")
+        raise FileNotFoundError(
+            f"Annotations not found at {annotations_location}! Export annotations with 'cyto cvat export' before measuring."
+        )
 
     annotations = COCO(annotations_location)
 

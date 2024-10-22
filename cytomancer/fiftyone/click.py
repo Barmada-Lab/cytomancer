@@ -1,14 +1,15 @@
-from pathlib import Path
-import shutil
 import inspect
+import shutil
 import time
+from pathlib import Path
 
-import fiftyone as fo
 import click
+import fiftyone as fo
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.dask import dask_client
 from cytomancer.experiment import ExperimentType
+
 from .import_survival import do_import_survival
 from .ingest import do_ingest_cq1
 from .zhuzh import zhuzh
@@ -38,12 +39,28 @@ def delete_dataset(dataset_name: str) -> None:
 @click.command("ingest")
 @experiment_dir_argument()
 @experiment_type_argument()
-@click.option("--name", default="", help="Name of the dataset to create; defaults to the name of experiment_dir")
+@click.option(
+    "--name",
+    default="",
+    help="Name of the dataset to create; defaults to the name of experiment_dir",
+)
 @click.option("--regions", default="", help="Comma-separated list of regions to ingest")
 @click.option("--fields", default="", help="Comma-separated list of fields to ingest")
-@click.option("--channels", default="", help="Comma-separated list of channels to ingest")
-@click.option("--timepoints", default="", help="Comma-separated list of timepoints to ingest")
-def ingest(experiment_dir: Path, experiment_type: ExperimentType, name: str, regions, fields, channels, timepoints) -> None:
+@click.option(
+    "--channels", default="", help="Comma-separated list of channels to ingest"
+)
+@click.option(
+    "--timepoints", default="", help="Comma-separated list of timepoints to ingest"
+)
+def ingest(
+    experiment_dir: Path,
+    experiment_type: ExperimentType,  # noqa: ARG001
+    name: str,
+    regions,
+    fields,
+    channels,
+    timepoints,
+) -> None:
     regions = regions.split(",") if regions else []
     fields = fields.split(",") if fields else []
     timepoints = [int(t) for t in timepoints.split(",")] if timepoints else []
@@ -55,7 +72,11 @@ def ingest(experiment_dir: Path, experiment_type: ExperimentType, name: str, reg
 
 @click.command("import-survival")
 @experiment_dir_argument()
-@click.option("--name", default="", help="Name of the importing fiftyone dataset; defaults to the name of experiment_dir")
+@click.option(
+    "--name",
+    default="",
+    help="Name of the importing fiftyone dataset; defaults to the name of experiment_dir",
+)
 def import_survival(experiment_dir: Path, name: str) -> None:
     name = name if name else experiment_dir.name
     do_import_survival(experiment_dir, name)

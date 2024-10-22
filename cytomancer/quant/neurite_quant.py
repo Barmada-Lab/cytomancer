@@ -1,11 +1,11 @@
 from pathlib import Path
-import joblib
 
-from skimage.morphology import skeletonize
-from skimage.measure import label, regionprops
-from sklearn.pipeline import Pipeline
-import xarray as xr
+import joblib
 import numpy as np
+import xarray as xr
+from skimage.measure import label, regionprops
+from skimage.morphology import skeletonize
+from sklearn.pipeline import Pipeline
 
 from cytomancer.experiment import ExperimentType
 from cytomancer.oneoffs import ilastish_seg_model
@@ -13,11 +13,12 @@ from cytomancer.utils import load_experiment
 
 
 def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):
-
     gfp = experiment.sel(channel="GFP")
 
     def segment_and_skeletonize(field):
-        segmented = ilastish_seg_model.predict(field, model) == ilastish_seg_model.FOREGROUND
+        segmented = (
+            ilastish_seg_model.predict(field, model) == ilastish_seg_model.FOREGROUND
+        )
         skeleton = skeletonize(segmented)
         labelled = label(skeleton)
         filtered = np.zeros_like(labelled, dtype=bool)
@@ -33,15 +34,13 @@ def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):
         output_core_dims=[["y", "x"]],
         dask="parallelized",
         vectorize=True,
-        output_dtypes=[bool]
+        output_dtypes=[bool],
     ).drop_vars("channel")
 
 
 def run(
-        experiment_path: Path,
-        experiment_type: ExperimentType,
-        ilastish_model_path: Path):
-
+    experiment_path: Path, experiment_type: ExperimentType, ilastish_model_path: Path
+):
     experiment = load_experiment(experiment_path, experiment_type)
     model = joblib.load(ilastish_model_path)
 
@@ -52,4 +51,6 @@ def run(
     results_dir = experiment_path / "results"
     results_dir.mkdir(exist_ok=True)
 
-    neurite_length.to_dataframe("neurite_length").to_csv(results_dir / "neurite_lengths.csv")
+    neurite_length.to_dataframe("neurite_length").to_csv(
+        results_dir / "neurite_lengths.csv"
+    )

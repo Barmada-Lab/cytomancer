@@ -1,18 +1,18 @@
-from pathlib import Path
-from typing import Callable
-from dataclasses import dataclass
-import logging
 import atexit
+import logging
 import shutil
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 
-from pycocotools.coco import COCO
-import xarray as xr
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xarray as xr
+from pycocotools.coco import COCO
 
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment, iter_idx_prod
 from cytomancer.config import config
+from cytomancer.experiment import ExperimentType
+from cytomancer.utils import iter_idx_prod, load_experiment
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,9 @@ class Roi:
     mask: np.ndarray
 
 
-def broadcast_and_concat(f: Callable[[np.ndarray, np.ndarray], pd.DataFrame]) -> Callable[[np.ndarray, xr.DataArray], pd.DataFrame]:
+def broadcast_and_concat(
+    f: Callable[[np.ndarray, np.ndarray], pd.DataFrame],
+) -> Callable[[np.ndarray, xr.DataArray], pd.DataFrame]:
     def wrapper(mask: np.ndarray, intensity: xr.DataArray) -> pd.DataFrame:
         measurement_df = pd.DataFrame()
         for frame in iter_idx_prod(intensity, subarr_dims=["y", "x"]):
@@ -32,6 +34,7 @@ def broadcast_and_concat(f: Callable[[np.ndarray, np.ndarray], pd.DataFrame]) ->
             frame_measurements = f(mask, frame.values).assign(**coords)  # type: ignore
             measurement_df = pd.concat([measurement_df, frame_measurements])
         return measurement_df
+
     return wrapper
 
 
@@ -64,7 +67,6 @@ def std_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
 
 
 def measure(roi: Roi, intensity: xr.DataArray, measurement_names):
-
     roi_meta = {"roi_id": roi.id, "label": roi.label}
     dfs = []
     for measurement_name in measurement_names:
@@ -80,32 +82,30 @@ def measure(roi: Roi, intensity: xr.DataArray, measurement_names):
 
 
 measurement_fn_lut = {
-    'mean': mean_roi,
-    'median': median_roi,
-    'area': area_roi,
-    'std': std_roi
+    "mean": mean_roi,
+    "median": median_roi,
+    "area": area_roi,
+    "std": std_roi,
 }
 
 
-broadcast_modes = {
-    "channel",
-    "z",
-    "time"
-}
+broadcast_modes = {"channel", "z", "time"}
 
 
 def measure_experiment(  # noqa: C901
-        experiment_dir: Path,
-        experiment_type: ExperimentType,
-        roi_set_name: str,
-        measurement_names: set[str],
-        z_projection_mode: str = "none",
-        roi_broadcasting: list[str] = []):
-
-    if (not_supported := measurement_names - measurement_fn_lut.keys()):
+    experiment_dir: Path,
+    experiment_type: ExperimentType,
+    roi_set_name: str,
+    measurement_names: set[str],
+    z_projection_mode: str = "none",
+    roi_broadcasting: list[str] = None,
+):
+    if roi_broadcasting is None:
+        roi_broadcasting = []
+    if not_supported := measurement_names - measurement_fn_lut.keys():
         raise ValueError(f"Invalid measurements: {not_supported}")
 
-    if (not_supported := set(roi_broadcasting) - broadcast_modes):
+    if not_supported := set(roi_broadcasting) - broadcast_modes:
         raise ValueError(f"Invalid broadcast mode: {not_supported}")
 
     if z_projection_mode not in ["none", "maximum_intensity", "sum"]:
@@ -117,7 +117,7 @@ def measure_experiment(  # noqa: C901
     logger.info("Caching experiment as zarray... this may take a few minutes.")
     exp_cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
     atexit.register(lambda: shutil.rmtree(exp_cache_dir, ignore_errors=True))
-    ds = xr.Dataset(dict(intensity=experiment))
+    ds = xr.Dataset({"intensity": experiment})
     ds.to_zarr(exp_cache_dir, mode="w")
 
     intensity = xr.open_zarr(exp_cache_dir).intensity
@@ -131,21 +131,31 @@ def measure_experiment(  # noqa: C901
             intensity = intensity.sum("z")
 
     if z_projection_mode != "none" and "z" in roi_broadcasting:
-        raise ValueError("Cannot broadcast over z axis with z projection enabled. Disable one or the other.")
+        raise ValueError(
+            "Cannot broadcast over z axis with z projection enabled. Disable one or the other."
+        )
 
     upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
     if not upload_record_location.exists():
-        raise FileNotFoundError(f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?")
+        raise FileNotFoundError(
+            f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?"
+        )
 
     dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
     try:
-        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"]).set_index("frame")
+        task_df = pd.read_csv(
+            upload_record_location, dtype=dtype_spec, parse_dates=["time"]
+        ).set_index("frame")
     except ValueError:
-        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec).set_index("frame")
+        task_df = pd.read_csv(upload_record_location, dtype=dtype_spec).set_index(
+            "frame"
+        )
 
     annotations_location = experiment_dir / "results" / "annotations" / roi_set_name
     if not annotations_location.exists():
-        raise FileNotFoundError(f"Annotations not found at {annotations_location}! Export annotations with 'cyto cvat export' before measuring.")
+        raise FileNotFoundError(
+            f"Annotations not found at {annotations_location}! Export annotations with 'cyto cvat export' before measuring."
+        )
 
     annotations = COCO(annotations_location)
 
@@ -164,11 +174,13 @@ def measure_experiment(  # noqa: C901
             roi = Roi(
                 id=annotation["id"],
                 label=cat_map[annotation["category_id"]],
-                mask=(annotations.annToMask(annotation) == 1)
+                mask=(annotations.annToMask(annotation) == 1),
             )
 
             if file_name not in task_df.index:
-                logger.error(f"{file_name} not found in {upload_record_location}! Skipping.")
+                logger.error(
+                    f"{file_name} not found in {upload_record_location}! Skipping."
+                )
                 continue
 
             roi_measurements = measure(roi, subarr, measurement_names)
@@ -188,4 +200,5 @@ def measure_experiment(  # noqa: C901
     measurements_df.to_csv(
         output_dir / f"measurements_{roi_set_name_stripped}.csv",
         index=False,
-        float_format="%.3f")
+        float_format="%.3f",
+    )

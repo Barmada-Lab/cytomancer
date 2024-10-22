@@ -1,15 +1,15 @@
-from pathlib import Path
 import logging
 import uuid
+from pathlib import Path
 
-from distributed import as_completed, get_client
-from skimage import exposure  # type: ignore
-from tqdm import tqdm
-from PIL import Image
+import dask
 import fiftyone as fo
 import pandas as pd
 import tifffile
-import dask
+from distributed import as_completed, get_client
+from PIL import Image
+from skimage import exposure  # type: ignore
+from tqdm import tqdm
 
 from cytomancer.config import config
 from cytomancer.io import cq1_loader
@@ -31,7 +31,6 @@ def get_or_create_dataset(name: str) -> fo.Dataset:
 
 
 def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
-
     client = get_client()
     axes = df.index.names
     media_dir = Path(dataset.info["media_dir"])  # type: ignore
@@ -40,12 +39,44 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
     def prepare_sample(coord_row):
         coords, row = coord_row
         path = row["path"]
-        fields_dict = dict(zip(axes, coords))
+        fields_dict = dict(zip(axes, coords, strict=False))
 
-        fields_dict["region_field_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"]]))
-        fields_dict["time_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"], fields_dict["channel"]]))
-        fields_dict["channel_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"], fields_dict["time"]]))
-        fields_dict["z_stack_key"] = "-".join(map(str, [fields_dict["region"], fields_dict["field"], fields_dict["time"], fields_dict["channel"]]))
+        fields_dict["region_field_key"] = "-".join(
+            map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"]])
+        )
+        fields_dict["time_stack_key"] = "-".join(
+            map(
+                str,
+                [
+                    fields_dict["region"],
+                    fields_dict["field"],
+                    fields_dict["z"],
+                    fields_dict["channel"],
+                ],
+            )
+        )
+        fields_dict["channel_stack_key"] = "-".join(
+            map(
+                str,
+                [
+                    fields_dict["region"],
+                    fields_dict["field"],
+                    fields_dict["z"],
+                    fields_dict["time"],
+                ],
+            )
+        )
+        fields_dict["z_stack_key"] = "-".join(
+            map(
+                str,
+                [
+                    fields_dict["region"],
+                    fields_dict["field"],
+                    fields_dict["time"],
+                    fields_dict["channel"],
+                ],
+            )
+        )
 
         arr = tifffile.imread(path)
         rescaled = exposure.rescale_intensity(arr, out_range="uint8")
@@ -76,13 +107,13 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
 
 
 def do_ingest_cq1(
-        base_path: Path,
-        name: str,
-        regions: list[str],
-        fields: list[str],
-        channels: list[str],
-        timepoints: list[int]):
-
+    base_path: Path,
+    name: str,
+    regions: list[str],
+    fields: list[str],
+    channels: list[str],
+    timepoints: list[int],
+):
     dataset = get_or_create_dataset(name)
     df = cq1_loader.get_experiment_df(base_path).reset_index()
 

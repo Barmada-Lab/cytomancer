@@ -1,20 +1,18 @@
-from typing import Tuple
-import pathlib as pl
-from itertools import product
-import xml.etree.ElementTree as xml
-import warnings
 import logging
-
-from datetime import datetime
-import tifffile
-import dask.array as da
-import dask
-import pandas as pd
-import ome_types
-import xarray as xr
-import numpy as np
+import pathlib as pl
 import re
+import warnings
+import xml.etree.ElementTree as xml
+from datetime import datetime
+from itertools import product
 
+import dask
+import dask.array as da
+import numpy as np
+import ome_types
+import pandas as pd
+import tifffile
+import xarray as xr
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +27,13 @@ CHANNEL_EX_EM_LUT = {
 }
 
 PLATE_WELL_LUT = {
-    (8, 12): [r+c for r, c in product(["A", "B", "C", "D", "E", "F", "G", "H"], ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"])],
+    (8, 12): [
+        r + c
+        for r, c in product(
+            ["A", "B", "C", "D", "E", "F", "G", "H"],
+            ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"],
+        )
+    ],
 }
 
 
@@ -47,7 +51,6 @@ def _try_parse_dir(path: pl.Path) -> datetime | None:
 
 
 def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent flake8
-
     ome_xml = ome_types.from_xml(path / ome_xml_filename)
 
     result_xml_path = path / "ImagingResult.xml"
@@ -67,7 +70,10 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
     if (rows, cols) in PLATE_WELL_LUT:
         wells = PLATE_WELL_LUT[(rows, cols)]  # type: ignore
     else:
-        warnings.warn("Could not find well names for this plate size. Falling back to integer-based well names. Consider adding plate size to PLATE_WELL_LUT in cq1_loader.py.")
+        warnings.warn(
+            "Could not find well names for this plate size. Falling back to integer-based well names. Consider adding plate size to PLATE_WELL_LUT in cq1_loader.py.",
+            stacklevel=2,
+        )
         wells = [f"{d:02}_{c:02}" for d, c in product(range(rows), range(cols))]  # type: ignore
 
     ex_px = ome_xml.images[1].pixels
@@ -75,7 +81,10 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
     channels = []
     for channel in ex_px.channels:
         if channel.illumination_type.value == "Epifluorescence":  # type: ignore
-            ex, em = int(channel.excitation_wavelength), int(channel.emission_wavelength)  # type: ignore
+            ex, em = (
+                int(channel.excitation_wavelength),
+                int(channel.emission_wavelength),
+            )  # type: ignore
             channel_str = CHANNEL_EX_EM_LUT.get((ex, em), f"{ex}nm/{em}nm")  # type: ignore
             channels.append(channel_str)
         else:
@@ -86,14 +95,17 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
         channels = list(range(len(channels)))
 
     shape = (ex_px.size_x, ex_px.size_y)
-    attrs = dict(
-        ome_xml_filename=ome_xml_filename,
-        px_size_x=ex_px.physical_size_x,
-        px_size_y=ex_px.physical_size_y,
-        px_size_z=ex_px.physical_size_z)  # note: for MIPs, means the z step size of the original images
+    attrs = {
+        "ome_xml_filename": ome_xml_filename,
+        "px_size_x": ex_px.physical_size_x,
+        "px_size_y": ex_px.physical_size_y,
+        "px_size_z": ex_px.physical_size_z,
+    }  # note: for MIPs, means the z step size of the original images
 
     records = []
-    for image in ome_xml.images[1:]:  # skip the first image, which contains only metadata
+    for image in ome_xml.images[
+        1:
+    ]:  # skip the first image, which contains only metadata
         assert image.name is not None, f"Image {image.id} has no name."
         image_match = re.match(CQ1_WELLPLATE_NAME_REGEX, image.name)
         assert image_match is not None, f"Failed to parse image name: {image.name}"
@@ -104,33 +116,51 @@ def get_tp_df(path: pl.Path, ome_xml_filename: str):  # noqa: C901, get bent fla
 
         pixels = image.pixels
 
-        for plane, data in zip(pixels.planes, pixels.tiff_data_blocks):
+        for plane, data in zip(pixels.planes, pixels.tiff_data_blocks, strict=False):
             z = plane.the_z
             t = plane.the_t
             c = channels[plane.the_c]
-            assert z is not None and t is not None and c is not None, f"Image plane is missing coordinate information: {plane}."
+            assert (
+                z is not None and t is not None and c is not None
+            ), f"Image plane is missing coordinate information: {plane}."
             assert data.uuid is not None, f"Data block {data.id} has no UUID."
             image_path = data.uuid.file_name
             assert image_path is not None, f"Data block {data.id} has no file name."
-            records.append({
-                "timepoint": t,
-                "channel": c,
-                "region": well_label,
-                "field": field_idx_label,
-                "z": z,
-                "path": path / image_path,
-            })
+            records.append(
+                {
+                    "timepoint": t,
+                    "channel": c,
+                    "region": well_label,
+                    "field": field_idx_label,
+                    "z": z,
+                    "path": path / image_path,
+                }
+            )
 
     df = pd.DataFrame.from_records(records)
-    df = df[["timepoint", "channel", "region", "field", "z", "path"]]  # explicitly order columns
+    df = df[
+        ["timepoint", "channel", "region", "field", "z", "path"]
+    ]  # explicitly order columns
     ts = df["timepoint"].unique().size
     acq_delta = acquisition_delta / ts
-    df["time"] = df["timepoint"].map(lambda t: start_time + acq_delta * t).astype("datetime64[ns]")
+    df["time"] = (
+        df["timepoint"]
+        .map(lambda t: start_time + acq_delta * t)
+        .astype("datetime64[ns]")
+    )
     df.drop("timepoint", axis=1, inplace=True)
 
     preliminary_mi = pd.MultiIndex.from_frame(df.drop(["path"], axis=1))
-    holy_mi = pd.MultiIndex.from_product(preliminary_mi.levels, names=preliminary_mi.names)
-    holy_df = df[["path"]].set_index(preliminary_mi).reindex(index=holy_mi).sort_index().replace({np.nan: None})
+    holy_mi = pd.MultiIndex.from_product(
+        preliminary_mi.levels, names=preliminary_mi.names
+    )
+    holy_df = (
+        df[["path"]]
+        .set_index(preliminary_mi)
+        .reindex(index=holy_mi)
+        .sort_index()
+        .replace({np.nan: None})
+    )
 
     return holy_df, shape, attrs
 
@@ -140,7 +170,9 @@ def tablefmt(d: dict, title: str | None = None) -> str:
     return fmtd + "\n".join([f"{k}: {v}" for k, v in d.items()])
 
 
-def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip", ordinal_time: bool = False) -> Tuple[pd.DataFrame, tuple, dict]:
+def get_experiment_df_detailed(
+    base_path: pl.Path, measurement_type: str = "mip", ordinal_time: bool = False
+) -> tuple[pd.DataFrame, tuple, dict]:
     """
     Indexes a CQ1 experiment directory by timepoint, channel, region, field, and z-slice.
 
@@ -163,8 +195,7 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
         multiindex = df.index
         time_index = multiindex.names.index("time")
         new_index = multiindex.set_levels(
-            multiindex.levels[time_index].map(lambda _: value),
-            level=time_index
+            multiindex.levels[time_index].map(lambda _: value), level=time_index
         )
         return df.set_index(new_index)
 
@@ -184,18 +215,28 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
 
     tps = [_try_parse_dir(acq.parent) for acq in acquisitions]
     if None in tps:
-        raise ValueError(f"One or more acquisition directories in {base_path} are not named according to the CQ1 convention, and cannot be parsed. \
-                          Please verify acquisition directory names.")
+        raise ValueError(
+            f"One or more acquisition directories in {base_path} are not named according to the CQ1 convention, and cannot be parsed. \
+                          Please verify acquisition directory names."
+        )
 
-    dt_paths = [(tp, path) for tp, path in zip(tps, acquisitions) if tp is not None]
+    dt_paths = [
+        (tp, path)
+        for tp, path in zip(tps, acquisitions, strict=False)
+        if tp is not None
+    ]
     dt_paths = sorted(dt_paths, key=lambda d: d[0])
 
     shape, attrs = None, None
     dfs = []
     for i, (_, path) in enumerate(dt_paths):
         tp_df, tp_shape, tp_attrs = get_tp_df(path.parent, measurement_file)
-        assert shape is None or shape == tp_shape, f"Shape mismatch: {shape} vs {tp_shape}"
-        assert attrs is None or attrs == tp_attrs, f"Attribute mismatch: {attrs} vs {tp_attrs}"
+        assert (
+            shape is None or shape == tp_shape
+        ), f"Shape mismatch: {shape} vs {tp_shape}"
+        assert (
+            attrs is None or attrs == tp_attrs
+        ), f"Attribute mismatch: {attrs} vs {tp_attrs}"
         shape, attrs = tp_shape, tp_attrs
         if ordinal_time:
             tp_df = reindex_time(tp_df, i)
@@ -203,20 +244,35 @@ def get_experiment_df_detailed(base_path: pl.Path, measurement_type: str = "mip"
 
     # validate homogeneity
 
-    channels = {acq[1].parent.name: set(df.index.get_level_values("channel")) for acq, df in zip(dt_paths, dfs)}
+    channels = {
+        acq[1].parent.name: set(df.index.get_level_values("channel"))
+        for acq, df in zip(dt_paths, dfs, strict=False)
+    }
     example_chans = list(channels.values())[0]
     if not all(c == example_chans for c in channels.values()):
-        raise ValueError(f"Channels are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(channels)}")
+        raise ValueError(
+            f"Channels are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(channels)}"
+        )
 
-    regions = {acq[1].parent.name: set(df.index.get_level_values("region")) for acq, df in zip(dt_paths, dfs)}
+    regions = {
+        acq[1].parent.name: set(df.index.get_level_values("region"))
+        for acq, df in zip(dt_paths, dfs, strict=False)
+    }
     example_regions = list(regions.values())[0]
     if not all(r == example_regions for r in regions.values()):
-        raise ValueError(f"Regions are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(regions)}")
+        raise ValueError(
+            f"Regions are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(regions)}"
+        )
 
-    fields = {acq[1].parent.name: set(df.index.get_level_values("field")) for acq, df in zip(dt_paths, dfs)}
+    fields = {
+        acq[1].parent.name: set(df.index.get_level_values("field"))
+        for acq, df in zip(dt_paths, dfs, strict=False)
+    }
     example_fields = list(fields.values())[0]
     if not all(f == example_fields for f in fields.values()):
-        raise ValueError(f"Fields are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(fields)}")
+        raise ValueError(
+            f"Fields are not homogeneous across all acquisitions; this is not supported.\n{tablefmt(fields)}"
+        )
 
     df = pd.concat(dfs)
     return df, shape, attrs  # type: ignore
@@ -227,14 +283,17 @@ def get_experiment_df(base_path: pl.Path, ordinal_time: bool = False) -> pd.Data
 
 
 def load_df(df, shape, attrs) -> xr.DataArray:
-
     def read_img(path):
         logger.debug(f"Reading {path}")
         if path is None:
-            logger.warning("MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs...")
+            logger.warning(
+                "MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs..."
+            )
             return np.full(shape, np.nan)
         elif not path.exists():
-            logger.warning(f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs...")
+            logger.warning(
+                f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs..."
+            )
             return np.full(shape, np.nan)
         return tifffile.imread(path).astype(np.uint16)
 
@@ -259,8 +318,9 @@ def load_df(df, shape, attrs) -> xr.DataArray:
     arr = xr.DataArray(
         arr,
         dims=labels + ["y", "x"],
-        coords=dict((label, val) for label, val in zip(labels, df.index.levels)),  # type: ignore
-        attrs=attrs).isel({"y": slice(0, 1998), "x": slice(0, 1998)})
+        coords=dict(zip(labels, df.index.levels, strict=False)),  # type: ignore
+        attrs=attrs,
+    ).isel({"y": slice(0, 1998), "x": slice(0, 1998)})
 
     # The above method will produce coordinates of dtype object, which
     # causes issues downstream as it's inconsistent with other experiment loaders. '

@@ -1,17 +1,16 @@
 import logging
 import warnings
-
-import dask.config
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
 from pathlib import Path
+
 import dask
+import dask.config
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 USER_CONFIG_PATH = Path.home() / ".config" / "cytomancer.env"
 
 
 class CytomancerConfig(BaseSettings):
-
     log_level: str = "INFO"
 
     #  CVAT config
@@ -43,7 +42,9 @@ class CytomancerConfig(BaseSettings):
     @classmethod
     def exists(cls, path: Path):
         if not path.exists():
-            warnings.warn(f"Path {path} does not exist; this will cause problems")
+            warnings.warn(
+                f"Path {path} does not exist; this will cause problems", stacklevel=2
+            )
         return path
 
     def save(self):
@@ -54,8 +55,9 @@ class CytomancerConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=USER_CONFIG_PATH,
         env_file_encoding="utf-8",
-        env_prefix='cytomancer_',
-        extra="ignore")
+        env_prefix="cytomancer_",
+        extra="ignore",
+    )
 
 
 config = CytomancerConfig()
@@ -71,4 +73,6 @@ logging.getLogger("distributed.utils_perf").setLevel(level=logging.WARN)
 logging.getLogger("distributed.batched").setLevel(level=logging.WARN)
 
 dask.config.set({"distributed.scheduler.worker-ttl": "5m"})
-dask.config.set({"distributed.nanny.pre-spawn-environ": {"MALLOC_TRIM_THRESHOLD_": "0"}})
+dask.config.set(
+    {"distributed.nanny.pre-spawn-environ": {"MALLOC_TRIM_THRESHOLD_": "0"}}
+)

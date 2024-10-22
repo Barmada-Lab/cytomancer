@@ -1,22 +1,27 @@
-from pathlib import Path
-import logging
-import tempfile
 import atexit
+import logging
 import shutil
+import tempfile
 import uuid
-
-from cvat_sdk.models import TaskWriteRequest
 from dataclasses import dataclass
+from pathlib import Path
+
 import pandas as pd
-import xarray as xr
 import tifffile
+import xarray as xr
+from cvat_sdk.models import TaskWriteRequest
 
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment, iter_idx_prod
-from cytomancer.ops.display import apply_psuedocolor, clahe, rescale_intensity
 from cytomancer.config import config
-from .helpers import new_client_from_config, get_project, create_project, exponential_backoff
+from cytomancer.experiment import ExperimentType
+from cytomancer.ops.display import apply_psuedocolor, clahe, rescale_intensity
+from cytomancer.utils import iter_idx_prod, load_experiment
 
+from .helpers import (
+    create_project,
+    exponential_backoff,
+    get_project,
+    new_client_from_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +50,9 @@ def stage_task(arr: xr.DataArray, tmpdir: Path, blind: bool):
     return StagedTask(task_name, coords, files)
 
 
-def handle_staging(arr: xr.DataArray, tmpdir: Path, subarr_dims: list[str], blind: bool):
+def handle_staging(
+    arr: xr.DataArray, tmpdir: Path, subarr_dims: list[str], blind: bool
+):
     for subarr in iter_idx_prod(arr, subarr_dims=subarr_dims, shuffle=blind):
         yield stage_task(subarr, tmpdir, blind)  # type: ignore
 
@@ -53,31 +60,30 @@ def handle_staging(arr: xr.DataArray, tmpdir: Path, subarr_dims: list[str], blin
 @exponential_backoff(max_retries=5, base_delay=0.1)
 def upload_task(cvat_client, project_id, staged_task: StagedTask):
     cvat_client.tasks.create_from_data(
-        spec=TaskWriteRequest(
-            name=staged_task.name,
-            project_id=project_id),  # type: ignore
+        spec=TaskWriteRequest(name=staged_task.name, project_id=project_id),  # type: ignore
         resources=staged_task.files,
-        data_params=dict(image_quality=100))
+        data_params={"image_quality": 100},
+    )
 
 
 def fmt_records(staged_task: StagedTask):
-    for frame, coord in zip(staged_task.files, staged_task.coords):
+    for frame, coord in zip(staged_task.files, staged_task.coords, strict=False):
         yield {"frame": frame.name, **{dim: coord[dim].values for dim in coord}}
 
 
 def do_upload(  # noqa: C901
-        project_name: str,
-        experiment: xr.DataArray,
-        channels: list[str],
-        regions: list[str],
-        fields: list[str],
-        tps: list[str],
-        composite: bool,
-        projection: str,
-        subarr_dims: list[str],
-        clahe_clip: float,
-        blind: bool):
-
+    project_name: str,
+    experiment: xr.DataArray,
+    channels: list[str],
+    regions: list[str],
+    fields: list[str],
+    tps: list[str],
+    composite: bool,
+    projection: str,
+    subarr_dims: list[str],
+    clahe_clip: float,
+    blind: bool,
+):
     logger.info("finished caching experiment.")
 
     if len(channels) > 0:
@@ -90,7 +96,7 @@ def do_upload(  # noqa: C901
         experiment = experiment.sel(field=fields)
 
     if len(tps) > 0:
-        experiment = experiment.isel(time=list(map(lambda x: int(x) - 1, tps)))
+        experiment = experiment.isel(time=[int(x) - 1 for x in tps])
 
     match projection:
         case "sum":
@@ -114,7 +120,9 @@ def do_upload(  # noqa: C901
 
     # TODO: we can probably implement idempotency here to handle cases where uploads are interrupted
     if (project := get_project(cvat_client, project_name)) is not None:
-        raise ValueError(f"Project {project_name} taken! Please choose a different name or delete the pre-existing project.")
+        raise ValueError(
+            f"Project {project_name} taken! Please choose a different name or delete the pre-existing project."
+        )
 
     project = create_project(cvat_client, project_name)
 
@@ -135,19 +143,19 @@ def do_upload(  # noqa: C901
 
 
 def upload_experiment(
-        experiment_dir: Path,
-        experiment_type: ExperimentType,
-        project_name: str,
-        channels: str,
-        regions: str,
-        fields: str,
-        tps: str,
-        composite: bool,
-        projection: str,
-        dims: str,
-        clahe_clip: float,
-        blind: bool):
-
+    experiment_dir: Path,
+    experiment_type: ExperimentType,
+    project_name: str,
+    channels: str,
+    regions: str,
+    fields: str,
+    tps: str,
+    composite: bool,
+    projection: str,
+    dims: str,
+    clahe_clip: float,
+    blind: bool,
+):
     if project_name == "":
         project_name = experiment_dir.name
 
@@ -157,7 +165,7 @@ def upload_experiment(
     logger.info("Caching experiment as zarray... this may take a few minutes.")
     cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
     atexit.register(lambda: shutil.rmtree(cache_dir, ignore_errors=True))
-    ds = xr.Dataset(dict(intensity=experiment))
+    ds = xr.Dataset({"intensity": experiment})
     ds.to_zarr(cache_dir, mode="w")
 
     experiment = xr.open_zarr(cache_dir).intensity
@@ -182,7 +190,8 @@ def upload_experiment(
         projection=projection,
         subarr_dims=subarr_dims,
         clahe_clip=clahe_clip,
-        blind=blind)
+        blind=blind,
+    )
 
     cvat_upload_records = experiment_dir / "results" / "cvat_upload.csv"
     cvat_upload_records.parent.mkdir(parents=True, exist_ok=True)

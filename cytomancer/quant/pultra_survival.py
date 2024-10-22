@@ -1,17 +1,18 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
-from sklearn.pipeline import Pipeline
-from skimage.measure import regionprops
-from dask.distributed import Worker, get_client
-import xarray as xr
-import pandas as pd
 import numpy as np
+import pandas as pd
+import xarray as xr
+from dask.distributed import Worker, get_client
+from skimage.measure import regionprops
+from sklearn.pipeline import Pipeline
 
-from cytomancer.utils import load_experiment
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
 from cytomancer.io.cyto_dir import load_dir
+from cytomancer.utils import load_experiment
+
 from .pultra_classifier import load_classifier
 
 logger = logging.getLogger(__name__)
@@ -31,12 +32,11 @@ def get_features(mask, dapi, gfp, rfp, field_medians):
         "dapi_signal": dapi_signal,
         "gfp_signal": gfp_signal,
         "rfp_signal": rfp_signal,
-        "size": size
+        "size": size,
     }
 
 
 def predict(dapi, gfp, rfp, nuc_labels, classifier):
-
     dapi_field_med = np.median(dapi)
     gfp_field_med = np.median(gfp)
     rfp_field_med = np.median(rfp)
@@ -50,7 +50,9 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
         if dapi_mean / dapi_field_med < DAPI_SNR_THRESHOLD:
             continue
 
-        features = get_features(mask, dapi, gfp, rfp, [dapi_field_med, gfp_field_med, rfp_field_med])
+        features = get_features(
+            mask, dapi, gfp, rfp, [dapi_field_med, gfp_field_med, rfp_field_med]
+        )
         df = pd.DataFrame.from_records([features])
         if classifier.predict(df)[0]:
             preds[mask] = LIVE
@@ -61,14 +63,14 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
 
 
 def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipeline):
-
-    def process_field(dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray, nuc_labels: np.ndarray):
-
+    def process_field(
+        dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray, nuc_labels: np.ndarray
+    ):
         if np.issubdtype(nuc_labels.dtype, np.floating):
-            return (np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8))
+            return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
 
         if np.isnan(dapi).any() or np.isnan(gfp).any() or np.isnan(rfp).any():
-            return (np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8))
+            return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
 
         preds = predict(dapi, gfp, rfp, nuc_labels, classifier)
         return preds
@@ -84,19 +86,19 @@ def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipel
         vectorize=True,
         dask="parallelized",
         join="inner",
-        output_dtypes=[np.uint8])
+        output_dtypes=[np.uint8],
+    )
 
-    return xr.Dataset({
-        "preds": preds
-    })
+    return xr.Dataset({"preds": preds})
 
 
 def quantify(nuc_labels: xr.DataArray, preds: xr.DataArray):
-
     def quantify_field(nuc_labels, preds):
         if (nuc_labels == np.iinfo(np.uint16).max).all():
             return np.asarray([np.nan])
-        return np.asarray([np.unique(nuc_labels[np.where(preds == LIVE)]).shape[0]], dtype=float)
+        return np.asarray(
+            [np.unique(nuc_labels[np.where(preds == LIVE)]).shape[0]], dtype=float
+        )
 
     return xr.apply_ufunc(
         quantify_field,
@@ -106,18 +108,21 @@ def quantify(nuc_labels: xr.DataArray, preds: xr.DataArray):
         output_core_dims=[["count"]],
         dask_gufunc_kwargs={"output_sizes": {"count": 1}},
         vectorize=True,
-        dask="parallelized").squeeze("count", drop=True)
+        dask="parallelized",
+    ).squeeze("count", drop=True)
 
 
 def run(
-        experiment_path: Path,
-        experiment_type: ExperimentType,
-        svm_model_path: Path,
-        save_annotations: bool):
-
+    experiment_path: Path,
+    experiment_type: ExperimentType,
+    svm_model_path: Path,
+    save_annotations: bool,
+):
     results_dir = experiment_path / "results"
     seg_results_dir = results_dir / "stardist_nuc_seg"
-    assert seg_results_dir.exists(), "Nuclear segmentation results not found. Please run nuclear segmentation first."
+    assert (
+        seg_results_dir.exists()
+    ), "Nuclear segmentation results not found. Please run nuclear segmentation first."
 
     client = get_client()
     logger.info(f"Connected to dask scheduler {client.scheduler}")
@@ -155,7 +160,9 @@ def run(
         preds = xr.open_zarr(store_path)
 
     quantified = quantify(nuc_labels, preds["preds"])
-    df = quantified.to_dataframe(name="count", dim_order=["region", "field", "time"]).dropna()
+    df = quantified.to_dataframe(
+        name="count", dim_order=["region", "field", "time"]
+    ).dropna()
 
     df["count"] = df["count"].astype(int)
     df.to_csv(results_dir / "survival.csv")

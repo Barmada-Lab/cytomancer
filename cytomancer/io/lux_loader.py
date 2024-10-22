@@ -7,7 +7,9 @@ from . import ioutils
 
 
 def load_lux(base: pl.Path, fillna: bool = True) -> xr.DataArray:
-    timepoint_tags = sorted([int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*")])
+    timepoint_tags = sorted(
+        [int(path.name.replace("T", "")) for path in base.glob("raw_imgs/*")]
+    )
     region_tags = set()
     field_tags = set()
     exposure_tags = set()
@@ -31,7 +33,12 @@ def load_lux(base: pl.Path, fillna: bool = True) -> xr.DataArray:
             for region in region_tags:
                 fields = []
                 for field in field_tags:
-                    path = base / "raw_imgs" / f"T{timepoint}" / f"{region}-{field}-{exposure}.tif"
+                    path = (
+                        base
+                        / "raw_imgs"
+                        / f"T{timepoint}"
+                        / f"{region}-{field}-{exposure}.tif"
+                    )
                     img = ioutils.read_tiff_toarray(path)
                     fields.append(img)
                 regions.append(da.stack(fields))
@@ -51,7 +58,7 @@ def load_lux(base: pl.Path, fillna: bool = True) -> xr.DataArray:
             "time": timepoint_tags,
             "region": region_coords,
             "field": field_coords,
-        }
+        },
     )
 
     if fillna:

@@ -1,28 +1,31 @@
 from pathlib import Path
 
+import pandas as pd
+from cvat_sdk.models import LabeledShapeRequest, ShapeType, TaskAnnotationsUpdateRequest
 from skimage import exposure, filters, morphology  # type: ignore
 from stardist.models import StarDist2D
-from cvat_sdk.models import TaskAnnotationsUpdateRequest, ShapeType, LabeledShapeRequest
 
-import pandas as pd
-import numpy as np
-
-from cytomancer.cvat.helpers import new_client_from_config, get_project, get_project_label_map, get_rles
 from cytomancer.config import config
+from cytomancer.cvat.helpers import (
+    get_project,
+    get_project_label_map,
+    get_rles,
+    new_client_from_config,
+)
 from cytomancer.experiment import ExperimentType
 from cytomancer.utils import load_experiment
 
 
 def run(
-        project_name: str,
-        experiment_dir: Path,
-        experiment_type: ExperimentType,
-        channel: str,
-        label_name: str,
-        adapteq_clip_limit: float,
-        median_filter_d: int,
-        model_name: str):
-
+    project_name: str,
+    experiment_dir: Path,
+    experiment_type: ExperimentType,
+    channel: str,
+    label_name: str,
+    adapteq_clip_limit: float,
+    median_filter_d: int,
+    model_name: str,
+):
     client = new_client_from_config(config)
     if (project := get_project(client, project_name)) is None:
         print(f"No projects matching query '{project_name}' found.")
@@ -39,7 +42,9 @@ def run(
 
     if label_name not in label_map:
         print(f"No labels matching query '{label_name}' found.")
-        print(f"Please create a label with the name '{label_name}' in project '{project_name}'.")
+        print(
+            f"Please create a label with the name '{label_name}' in project '{project_name}'."
+        )
         return
 
     label_id = label_map[label_name]
@@ -50,14 +55,18 @@ def run(
         return
 
     dtype_spec = {"channel": str, "z": str, "region": str, "field": str}
-    task_df = pd.read_csv(upload_record_location, dtype=dtype_spec, parse_dates=["time"]).set_index("frame")
+    task_df = pd.read_csv(
+        upload_record_location, dtype=dtype_spec, parse_dates=["time"]
+    ).set_index("frame")
 
     intensity = load_experiment(experiment_dir, experiment_type)
     model = StarDist2D.from_pretrained(model_name)
 
     for task in tasks:
         job = task.get_jobs()[0]
-        selectors = [task_df.loc[frame.name].to_dict() for frame in job.get_frames_info()]
+        selectors = [
+            task_df.loc[frame.name].to_dict() for frame in job.get_frames_info()
+        ]
         channels = [selector["channel"] for selector in selectors]
 
         chan_idx = channels.index(channel)
@@ -69,18 +78,17 @@ def run(
         preds, _ = model.predict_instances(med)  # type: ignore
 
         shapes = []
-        for id, rle in get_rles(preds):  # type: ignore
+        for _id, rle in get_rles(preds):  # type: ignore
             shapes.append(
                 LabeledShapeRequest(
                     type=ShapeType("mask"),
                     points=rle,
                     label_id=label_id,
                     frame=chan_idx,
-                ))
+                )
+            )
 
         client.api_client.tasks_api.update_annotations(
             id=task.id,
-            task_annotations_update_request=TaskAnnotationsUpdateRequest(
-                shapes=shapes
-            )
+            task_annotations_update_request=TaskAnnotationsUpdateRequest(shapes=shapes),
         )

@@ -1,14 +1,15 @@
-from PIL import ImageColor
-from skimage import exposure, color, util  # type: ignore
-import xarray as xr
 import numpy as np
+import xarray as xr
+from PIL import ImageColor
+from skimage import color, exposure, util  # type: ignore
 
 
 def rescale_intensity(arr: xr.DataArray, dims: list[str], **kwargs):
-
-    def _rescale_intensity(frame, in_percentile: tuple[int, int] | None = None, **kwargs):
+    def _rescale_intensity(
+        frame, in_percentile: tuple[int, int] | None = None, **kwargs
+    ):
         if in_percentile is not None:
-            l, h = np.percentile(frame, in_percentile)  # type: ignore
+            l, h = np.percentile(frame, in_percentile)  # noqa: E741
             kwargs.pop("in_range", None)
             return exposure.rescale_intensity(frame, in_range=(l, h), **kwargs)
         else:
@@ -20,13 +21,13 @@ def rescale_intensity(arr: xr.DataArray, dims: list[str], **kwargs):
         kwargs=kwargs,
         input_core_dims=[dims],
         output_core_dims=[dims],
-        dask_gufunc_kwargs=dict(allow_rechunk=True),
+        dask_gufunc_kwargs={"allow_rechunk": True},
         vectorize=True,
-        dask="parallelized")
+        dask="parallelized",
+    )
 
 
 def clahe(arr: xr.DataArray, clip_limit: float):
-
     def _clahe(frame, clip_limit):
         rescaled = exposure.rescale_intensity(frame, out_range=(0, 1))
         return exposure.equalize_adapthist(rescaled, clip_limit=clip_limit)
@@ -34,19 +35,19 @@ def clahe(arr: xr.DataArray, clip_limit: float):
     return xr.apply_ufunc(
         _clahe,
         arr,
-        kwargs=dict(clip_limit=clip_limit),
+        kwargs={"clip_limit": clip_limit},
         input_core_dims=[["y", "x"]],
         output_core_dims=[["y", "x"]],
         vectorize=True,
-        dask="parallelized")
+        dask="parallelized",
+    )
 
 
 def apply_psuedocolor(arr: xr.DataArray) -> xr.DataArray:
-
     def _get_float_color(hexcode: str):
         rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
         max_val = max(rgb)
-        rgb_corrected = tuple(map(lambda x: x / max_val, rgb))
+        rgb_corrected = tuple(x / max_val for x in rgb)
         return rgb_corrected
 
     if "metadata" in arr.attrs:
@@ -56,7 +57,7 @@ def apply_psuedocolor(arr: xr.DataArray) -> xr.DataArray:
             intcode = channel.channel.colorRGB
             rgb = (intcode & 255, (intcode >> 8) & 255, (intcode >> 16) & 255)
             max_val = max(rgb)
-            float_color = tuple(map(lambda x: x / max_val, rgb))
+            float_color = tuple(x / max_val for x in rgb)
             color_codes[channel.channel.name] = float_color
     else:
         color_codes = {
@@ -80,9 +81,10 @@ def apply_psuedocolor(arr: xr.DataArray) -> xr.DataArray:
         arr["channel"],
         input_core_dims=[["y", "x"], []],
         output_core_dims=[["y", "x", "rgb"]],
-        dask_gufunc_kwargs=dict(output_sizes={"rgb": 3}),
+        dask_gufunc_kwargs={"output_sizes": {"rgb": 3}},
         output_dtypes=[np.uint8],
         vectorize=True,
-        dask="parallelized")
+        dask="parallelized",
+    )
 
     return rgb.transpose(..., "rgb")

@@ -1,18 +1,22 @@
 import logging
 from pathlib import Path
 
-from tqdm import tqdm
-from PIL import Image
-from distributed import as_completed, get_client
-from skimage import exposure, restoration  # type: ignore
 import dask
 import fiftyone as fo
 import numpy as np
+from distributed import as_completed, get_client
+from PIL import Image
+from skimage import exposure, restoration  # type: ignore
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 
-def zhuzh(dataset_name: str, apply_wavelet_denoising: bool = True, adapteq_clip_limit: float | None = 0.01):
+def zhuzh(
+    dataset_name: str,
+    apply_wavelet_denoising: bool = True,
+    adapteq_clip_limit: float | None = 0.01,
+):
     """
     Zhushes the dataset by applying adaptive histogram equalization and wavelet denoising
     to the view images (doesn't touch raw images)

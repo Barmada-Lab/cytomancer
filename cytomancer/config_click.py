@@ -25,6 +25,7 @@ def settings_options():
             decorator = click.option(f"--{k}", default=v, show_default=True)
             func = decorator(func)
         return func
+
     return combined_decorator
 
 

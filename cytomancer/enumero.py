@@ -1,5 +1,5 @@
-from functools import total_ordering
 import enum
+from functools import total_ordering
 
 
 @total_ordering

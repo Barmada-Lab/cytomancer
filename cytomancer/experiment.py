@@ -1,6 +1,8 @@
-from cytomancer.enumero import NaturalOrderStrEnum
-from enum import auto, StrEnum
+from enum import StrEnum, auto
+
 from PIL import ImageColor
+
+from cytomancer.enumero import NaturalOrderStrEnum
 
 
 class Axes(StrEnum):
@@ -24,7 +26,7 @@ class ExperimentType(NaturalOrderStrEnum):
 def _get_float_color(hexcode: str):
     rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
     max_val = max(rgb)
-    rgb_corrected = tuple(map(lambda x: x / max_val, rgb))
+    rgb_corrected = tuple(x / max_val for x in rgb)
     return rgb_corrected
 
 

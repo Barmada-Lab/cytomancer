@@ -1,9 +1,9 @@
-from itertools import groupby
 import time
+from itertools import groupby
 
+import numpy as np
 from cvat_sdk import Client, Config
 from skimage.measure import regionprops
-import numpy as np
 
 from cytomancer.config import CytomancerConfig
 
@@ -22,7 +22,9 @@ def exponential_backoff(max_retries=5, base_delay=0.1):
                     retries += 1
                     delay *= 2
                     time.sleep(delay)
+
         return wrapper
+
     return decorator
 
 
@@ -47,6 +49,7 @@ def test_cvat_credentials(cvat_url, cvat_username, cvat_password):
     """
     from cvat_sdk import Client
     from cvat_sdk.exceptions import ApiException
+
     client = Client(url=cvat_url)
     try:
         client.login((cvat_username, cvat_password))
@@ -71,7 +74,7 @@ def get_rles(labelled_arr: np.ndarray):
         mask = labelled_arr == id
         top, left, bottom, right = props.bbox
         rle = _mask_to_rle(mask[top:bottom, left:right])
-        rle += [left, top, right-1, bottom-1]
+        rle += [left, top, right - 1, bottom - 1]
         yield (id, rle)
 
 
@@ -79,7 +82,7 @@ def create_project(client: Client, project_name: str):
     """
     Creates a new project with the given name
     """
-    project = client.projects.create(dict(name=project_name))
+    project = client.projects.create({"name": project_name})
     return project
 
 
@@ -97,5 +100,8 @@ def get_project_label_map(client: Client, project_id: int):
     """
     Returns a list of all labelled arrays for a given project.
     """
-    labels = {label.name: label.id for label in client.projects.retrieve(project_id).get_labels()}
+    labels = {
+        label.name: label.id
+        for label in client.projects.retrieve(project_id).get_labels()
+    }
     return labels

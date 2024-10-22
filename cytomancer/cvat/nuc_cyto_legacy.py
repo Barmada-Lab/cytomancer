@@ -1,20 +1,21 @@
-import pathlib as pl
-import shutil
 import atexit
 import logging
+import pathlib as pl
+import shutil
 
-from cvat_sdk import Client
-from skimage.measure import regionprops
+import click
 import numpy as np
 import pandas as pd
 import xarray as xr
-import click
+from cvat_sdk import Client
+from skimage.measure import regionprops
 
+from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
-from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.utils import load_experiment
-from .helpers import new_client_from_config, get_project
+
+from .helpers import get_project, new_client_from_config
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ def rle_to_mask(rle: list[int], width: int, height: int) -> np.ndarray:
     value = 0
 
     for v in rle:
-        decoded[decoded_idx:decoded_idx + v] = [value] * v
+        decoded[decoded_idx : decoded_idx + v] = [value] * v
         decoded_idx += v
         value = abs(value - 1)
 
@@ -46,7 +47,7 @@ def shape_to_mask(shape, height, width):
     patch_height, patch_width = (bottom - top + 1, right - left + 1)
     patch = rle_to_mask(rle[:-4], patch_width, patch_height)
     mask = np.zeros((height, width), dtype=bool)
-    mask[top:bottom + 1, left:right + 1][patch] = True
+    mask[top : bottom + 1, left : right + 1][patch] = True
     return mask
 
 
@@ -67,20 +68,26 @@ def _parse_field_selector(selector: str):
     tokens = selector.split(FIELD_VALUE_DELIM)
     axis = tokens[0]
 
-    field_values = FIELD_VALUE_DELIM.join(tokens[1:])  # this allows field values to contain the FIELD_VALUE_DELIM, as is sometimes the case with filenames
+    field_values = FIELD_VALUE_DELIM.join(
+        tokens[1:]
+    )  # this allows field values to contain the FIELD_VALUE_DELIM, as is sometimes the case with filenames
 
     target_dtype = np.str_
 
     match axis:
         case "time":
-            field_value_tokens = np.array([np.datetime64(int(ts), 'ns')for ts in field_values.split(VALUE_DELIM)])
+            field_value_tokens = np.array(
+                [np.datetime64(int(ts), "ns") for ts in field_values.split(VALUE_DELIM)]
+            )
             if field_value_tokens.size == 1:
                 field_value = field_value_tokens[0]
                 return (axis, field_value)
             else:
                 return (axis, field_value_tokens)
         case _:
-            field_value_tokens = np.array(field_values.split(VALUE_DELIM)).astype(target_dtype)
+            field_value_tokens = np.array(field_values.split(VALUE_DELIM)).astype(
+                target_dtype
+            )
             if field_value_tokens.size == 1:
                 field_value = field_value_tokens[0]
                 return (axis, field_value)
@@ -102,7 +109,9 @@ def enumerate_rois(client: Client, project_id: int):
         frames = job_metadata.frames
         height, width = frames[0].height, frames[0].width
         anno_table = task_meta.get_annotations()
-        obj_arr, label_arr = get_obj_arr_and_labels(anno_table, len(frames), height, width)
+        obj_arr, label_arr = get_obj_arr_and_labels(
+            anno_table, len(frames), height, width
+        )
         selector = parse_selector(task_meta.name)
         yield selector, obj_arr, label_arr
 
@@ -120,19 +129,18 @@ def colocalize_rois(nuc_rois, soma_rois):
 
 
 def measure_nuc_cyto_ratio_legacy(  # noqa: C901
-        client: Client,
-        project_id: int,
-        intensity: xr.DataArray,
-        nuc_channel: str,
-        soma_channel: str,
-        measurement_channels: list[str] | None = None):
-
+    client: Client,
+    project_id: int,
+    intensity: xr.DataArray,
+    nuc_channel: str,
+    soma_channel: str,
+    measurement_channels: list[str] | None = None,
+):
     if measurement_channels is None:
         measurement_channels = intensity["channel"].values.tolist()
 
     df = pd.DataFrame()
     for selector, obj_arr, _ in enumerate_rois(client, project_id):
-
         subarr = intensity.sel(selector)
         channels = selector["channel"].tolist()
 
@@ -148,26 +156,32 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
 
         soma_measurements = []
         for props in regionprops(soma_mask):
-            soma_measurements.append({
-                "id": props.label,
-                "area_soma": props.area,
-            })
+            soma_measurements.append(
+                {
+                    "id": props.label,
+                    "area_soma": props.area,
+                }
+            )
         soma_df = pd.DataFrame.from_records(soma_measurements)
 
         cytoplasmic_measurements = []
         for props in regionprops(cyto_mask):
-            cytoplasmic_measurements.append({
-                "id": props.label,
-                "area_cyto": props.area,
-            })
+            cytoplasmic_measurements.append(
+                {
+                    "id": props.label,
+                    "area_cyto": props.area,
+                }
+            )
         cyto_df = pd.DataFrame.from_records(cytoplasmic_measurements)
 
         nuclear_measurements = []
         for props in regionprops(nuclear_mask):
-            nuclear_measurements.append({
-                "id": props.label,
-                "area_nuc": props.area,
-            })
+            nuclear_measurements.append(
+                {
+                    "id": props.label,
+                    "area_nuc": props.area,
+                }
+            )
         nuc_df = pd.DataFrame.from_records(nuclear_measurements)
 
         for channel in measurement_channels:  # type: ignore
@@ -177,32 +191,39 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
 
             field_intensity_arr = subarr.sel(channel=channel).values
 
-            assert cyto_mask.shape == field_intensity_arr.shape, \
-                f"cyto mask and intensity array have different shapes: {cyto_mask.shape} | {field_intensity_arr.shape}"
+            assert (
+                cyto_mask.shape == field_intensity_arr.shape
+            ), f"cyto mask and intensity array have different shapes: {cyto_mask.shape} | {field_intensity_arr.shape}"
 
             # measure soma
             for props in regionprops(soma_mask, intensity_image=field_intensity_arr):
                 mask = soma_mask == props.label
                 soma_df.loc[
-                    soma_df["id"] == props.label, f"{channel}_mean_soma"] = field_intensity_arr[mask].mean()
+                    soma_df["id"] == props.label, f"{channel}_mean_soma"
+                ] = field_intensity_arr[mask].mean()
                 soma_df.loc[
-                    soma_df["id"] == props.label, f"{channel}_std_soma"] = field_intensity_arr[mask].std()
+                    soma_df["id"] == props.label, f"{channel}_std_soma"
+                ] = field_intensity_arr[mask].std()
 
             # measure cyto
             for props in regionprops(cyto_mask, intensity_image=field_intensity_arr):
                 mask = cyto_mask == props.label
                 cyto_df.loc[
-                    cyto_df["id"] == props.label, f"{channel}_mean_cyto"] = field_intensity_arr[mask].mean()
+                    cyto_df["id"] == props.label, f"{channel}_mean_cyto"
+                ] = field_intensity_arr[mask].mean()
                 cyto_df.loc[
-                    cyto_df["id"] == props.label, f"{channel}_std_cyto"] = field_intensity_arr[mask].std()
+                    cyto_df["id"] == props.label, f"{channel}_std_cyto"
+                ] = field_intensity_arr[mask].std()
 
             # measure nuc
             for props in regionprops(nuclear_mask, intensity_image=field_intensity_arr):
                 mask = nuclear_mask == props.label
                 nuc_df.loc[
-                    nuc_df["id"] == props.label, f"{channel}_mean_nuc"] = field_intensity_arr[mask].mean()
+                    nuc_df["id"] == props.label, f"{channel}_mean_nuc"
+                ] = field_intensity_arr[mask].mean()
                 nuc_df.loc[
-                    nuc_df["id"] == props.label, f"{channel}_std_nuc"] = field_intensity_arr[mask].std()
+                    nuc_df["id"] == props.label, f"{channel}_std_nuc"
+                ] = field_intensity_arr[mask].std()
 
         colocalized = dict(colocalize_rois(nuclear_mask, soma_mask))
         nuc_df["id"] = nuc_df["id"].map(colocalized)
@@ -220,25 +241,34 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
 @experiment_type_argument()
 @click.argument("nuc_channel", type=str)
 @click.argument("soma_channel", type=str)
-@click.option("--projection", type=click.Choice(["none", "max", "sum"]), default="none", help="z-projection mode")
-@click.option("--channels", type=str, default="", help="comma-separated list of channels to measure from; defaults to all")
+@click.option(
+    "--projection",
+    type=click.Choice(["none", "max", "sum"]),
+    default="none",
+    help="z-projection mode",
+)
+@click.option(
+    "--channels",
+    type=str,
+    default="",
+    help="comma-separated list of channels to measure from; defaults to all",
+)
 def cli_entry(
-        project_name: str,
-        experiment_dir: pl.Path,
-        experiment_type: ExperimentType,
-        nuc_channel: str,
-        soma_channel: str,
-        channels: str,
-        projection: str,
-        ):
-
+    project_name: str,
+    experiment_dir: pl.Path,
+    experiment_type: ExperimentType,
+    nuc_channel: str,
+    soma_channel: str,
+    channels: str,
+    projection: str,
+):
     logger.info("Reading experiment directory...")
     experiment = load_experiment(experiment_dir, experiment_type)
 
     logger.info("Caching experiment as zarray... this may take a few minutes.")
     cache_dir = config.scratch_dir / (experiment_dir.name + ".zarr")
     atexit.register(lambda: shutil.rmtree(cache_dir, ignore_errors=True))
-    ds = xr.Dataset(dict(intensity=experiment))
+    ds = xr.Dataset({"intensity": experiment})
     ds.to_zarr(cache_dir, mode="w")
 
     intensity = xr.open_zarr(cache_dir).intensity.astype(np.float32)
@@ -265,5 +295,7 @@ def cli_entry(
     output_dir = experiment_dir / "results"
     output_dir.mkdir(exist_ok=True)
 
-    df = measure_nuc_cyto_ratio_legacy(client, project_id, intensity, nuc_channel, soma_channel, channel_list)
+    df = measure_nuc_cyto_ratio_legacy(
+        client, project_id, intensity, nuc_channel, soma_channel, channel_list
+    )
     df.to_csv(output_dir / "nuc_cyto_CVAT.csv", index=False)

@@ -1,44 +1,54 @@
-from pathlib import Path
 import logging
+from pathlib import Path
 
-import tifffile
-from skimage.exposure import equalize_adapthist
-from skimage.restoration import denoise_wavelet
-from skimage import filters  # type: ignore
-from skimage.feature import hessian_matrix, hessian_matrix_eigvals
-from sklearn.model_selection import cross_validate
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from skimage import exposure  # type: ignore
-import pandas as pd
 import numpy as np
+import pandas as pd
+import tifffile
+from skimage import (
+    exposure,  # type: ignore
+    filters,  # type: ignore
+)
+from skimage.exposure import equalize_adapthist
+from skimage.feature import hessian_matrix, hessian_matrix_eigvals
+from skimage.restoration import denoise_wavelet
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import cross_validate
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
 
 
-SIGMAS = [.7, 1, 3.5]
+SIGMAS = [0.7, 1, 3.5]
 
 FOREGROUND = 1
 BACKGROUND = 2
 
 
 def preprocess_image(raw_image):
-
     rescaled_float = exposure.rescale_intensity(raw_image, out_range=float)
     eqd = equalize_adapthist(rescaled_float, clip_limit=0.05)
     denoised = denoise_wavelet(eqd)
-    gaussian_stack = [(f"gaussian-{s}", filters.gaussian(denoised, sigma=s)) for s in SIGMAS]
-    log_stack = [(f"LoG-{s}", filters.laplace(g[1])) for s, g in zip(SIGMAS[1:], gaussian_stack[1:])]
-    gg_mag_stack = [(f"sobel-{s}", filters.sobel(g[1])) for s, g in zip(SIGMAS[1:], gaussian_stack[1:])]
-    hessian_stack = [hessian_matrix(raw_image, sigma=s, mode='nearest') for s in SIGMAS[1:]]
-    hessian_eig_stack = [(f"hess_eig-{s}", hessian_matrix_eigvals(hess)[0]) for s, hess in zip(SIGMAS, hessian_stack)]
+    gaussian_stack = [
+        (f"gaussian-{s}", filters.gaussian(denoised, sigma=s)) for s in SIGMAS
+    ]
+    log_stack = [
+        (f"LoG-{s}", filters.laplace(g[1]))
+        for s, g in zip(SIGMAS[1:], gaussian_stack[1:], strict=False)
+    ]
+    gg_mag_stack = [
+        (f"sobel-{s}", filters.sobel(g[1]))
+        for s, g in zip(SIGMAS[1:], gaussian_stack[1:], strict=False)
+    ]
+    hessian_stack = [
+        hessian_matrix(raw_image, sigma=s, mode="nearest") for s in SIGMAS[1:]
+    ]
+    hessian_eig_stack = [
+        (f"hess_eig-{s}", hessian_matrix_eigvals(hess)[0])
+        for s, hess in zip(SIGMAS, hessian_stack, strict=False)
+    ]
 
-    feature_stack = (
-        gaussian_stack +
-        log_stack +
-        gg_mag_stack +
-        hessian_eig_stack)
+    feature_stack = gaussian_stack + log_stack + gg_mag_stack + hessian_eig_stack
 
     feature_labels = [f[0] for f in feature_stack]
     feature_data = np.stack([f[1] for f in feature_stack], axis=-1)
@@ -57,9 +67,9 @@ def extract_ilastish_features(raw_image, mask_image):
     labelled_features = feature_data[nonzero_indices]
 
     rows = []
-    for label, features in zip(labels, labelled_features):
+    for label, features in zip(labels, labelled_features, strict=False):
         row = {f: features[i] for i, f in enumerate(feature_labels)}
-        row['label'] = label
+        row["label"] = label
         rows.append(row)
 
     return pd.DataFrame.from_records(rows)
@@ -67,7 +77,7 @@ def extract_ilastish_features(raw_image, mask_image):
 
 def load_dataset(raw_paths, mask_paths):
     df = pd.DataFrame()
-    for raw_path, mask_path in zip(raw_paths, mask_paths):
+    for raw_path, mask_path in zip(raw_paths, mask_paths, strict=False):
         raw_img = tifffile.imread(raw_path)
         mask_path = tifffile.imread(mask_path)
         frame_df = extract_ilastish_features(raw_img, mask_path)
@@ -91,12 +101,10 @@ def train_seg_model(sample_dir: Path):
 
     df = load_dataset(raw_paths, mask_paths)
 
-    y = df['label']
-    X = df.drop(columns=['label'])
+    y = df["label"]
+    X = df.drop(columns=["label"])
 
-    model = make_pipeline(
-        StandardScaler(),
-        RandomForestClassifier())
+    model = make_pipeline(StandardScaler(), RandomForestClassifier())
 
     results = cross_validate(model, X, y)
     test_scores = results["test_score"]
@@ -105,6 +113,8 @@ def train_seg_model(sample_dir: Path):
 
 
 def predict(raw_image, model):
-    df = extract_ilastish_features(raw_image, np.ones(raw_image.shape)).drop(columns=['label'])
+    df = extract_ilastish_features(raw_image, np.ones(raw_image.shape)).drop(
+        columns=["label"]
+    )
     predictions = model.predict(df).reshape(raw_image.shape)
     return predictions
