@@ -204,6 +204,9 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
                 soma_df.loc[
                     soma_df["id"] == props.label, f"{channel}_std_soma"
                 ] = field_intensity_arr[mask].std()
+                soma_df.loc[
+                    soma_df["id"] == props.label, f"{channel}_median_soma"
+                ] = np.median(field_intensity_arr[mask])
 
             # measure cyto
             for props in regionprops(cyto_mask, intensity_image=field_intensity_arr):
@@ -214,6 +217,9 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
                 cyto_df.loc[
                     cyto_df["id"] == props.label, f"{channel}_std_cyto"
                 ] = field_intensity_arr[mask].std()
+                cyto_df.loc[
+                    cyto_df["id"] == props.label, f"{channel}_median_cyto"
+                ] = np.median(field_intensity_arr[mask])
 
             # measure nuc
             for props in regionprops(nuclear_mask, intensity_image=field_intensity_arr):
@@ -224,6 +230,9 @@ def measure_nuc_cyto_ratio_legacy(  # noqa: C901
                 nuc_df.loc[
                     nuc_df["id"] == props.label, f"{channel}_std_nuc"
                 ] = field_intensity_arr[mask].std()
+                nuc_df.loc[
+                    nuc_df["id"] == props.label, f"{channel}_median_nuc"
+                ] = np.median(field_intensity_arr[mask])
 
         colocalized = dict(colocalize_rois(nuclear_mask, soma_mask))
         nuc_df["id"] = nuc_df["id"].map(colocalized)

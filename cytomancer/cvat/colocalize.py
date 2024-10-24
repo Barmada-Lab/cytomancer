@@ -105,21 +105,33 @@ def nuc_cyto(
             cyto = np.bitwise_xor(soma, intersection)
 
             for frame in iter_idx_prod(subarr, subarr_dims=["y", "x"]):
+                nuc_area = nuc.sum()
+                soma_area = soma.sum()
+                cyto_area = cyto.sum()
                 nuc_mean = frame.values[nuc].mean()
                 nuc_std = frame.values[nuc].std()
+                nuc_med = np.median(frame.values[nuc])
                 soma_mean = frame.values[soma].mean()
                 soma_std = frame.values[soma].std()
+                soma_med = np.median(frame.values[soma])
                 cyto_mean = frame.values[cyto].mean()
                 cyto_std = frame.values[cyto].std()
+                cyto_med = np.median(frame.values[cyto])
                 frame_coords = {k: v.values.tolist() for k, v in frame.coords.items()}
                 measurement = {
                     "cell_id": cell_id,
+                    "nuc_area": nuc_area,
                     "nuc_mean": nuc_mean,
                     "nuc_std": nuc_std,
+                    "nu_med": nuc_med,
+                    "soma_area": soma_area,
                     "soma_mean": soma_mean,
                     "soma_std": soma_std,
+                    "soma_med": soma_med,
+                    "cyto_area": cyto_area,
                     "cyto_mean": cyto_mean,
                     "cyto_std": cyto_std,
+                    "cyto_med": cyto_med,
                     **frame_coords,
                 }
                 measurements.append(measurement)
