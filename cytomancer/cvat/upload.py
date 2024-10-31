@@ -2,7 +2,6 @@ import atexit
 import logging
 import shutil
 import tempfile
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,9 +32,9 @@ class StagedTask:
     files: list[Path]
 
 
-def stage_task(arr: xr.DataArray, tmpdir: Path, blind: bool):
+def stage_task(idx: int, arr: xr.DataArray, tmpdir: Path, blind: bool):
     region_name = arr.coords["region"].values
-    task_name = str(uuid.uuid4()) if blind else f"{region_name}_{uuid.uuid4()}"
+    task_name = f"{idx:06d}" if blind else f"{region_name}_{idx:08d}"
     coords, files = [], []
     subarr_dims = ["y", "x", "rgb"] if "rgb" in arr.dims else ["y", "x"]
     frames = list(iter_idx_prod(arr, subarr_dims=subarr_dims))
@@ -53,8 +52,10 @@ def stage_task(arr: xr.DataArray, tmpdir: Path, blind: bool):
 def handle_staging(
     arr: xr.DataArray, tmpdir: Path, subarr_dims: list[str], blind: bool
 ):
-    for subarr in iter_idx_prod(arr, subarr_dims=subarr_dims, shuffle=blind):
-        yield stage_task(subarr, tmpdir, blind)  # type: ignore
+    for idx, subarr in enumerate(
+        iter_idx_prod(arr, subarr_dims=subarr_dims, shuffle=blind)
+    ):
+        yield stage_task(idx, subarr, tmpdir, blind)  # type: ignore
 
 
 @exponential_backoff(max_retries=5, base_delay=0.1)
