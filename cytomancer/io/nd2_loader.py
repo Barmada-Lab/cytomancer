@@ -49,7 +49,7 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
 
     arrs = []
     for path in paths:
-        nd2 = load_nd2(path)
+        nd2 = load_nd2(path).drop_vars(["y", "x"])
         arrs.append(nd2)
 
     assert (
@@ -83,8 +83,4 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
 
         homogenized.append(resized)
 
-    return (
-        xr.concat(homogenized, dim="region")
-        .assign_coords({"region": regions})
-        .drop_vars(["z", "y", "x"])
-    )
+    return xr.concat(homogenized, dim="region").assign_coords({"region": regions})
