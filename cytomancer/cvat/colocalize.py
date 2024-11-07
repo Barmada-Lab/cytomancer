@@ -123,7 +123,7 @@ def nuc_cyto(
                     "nuc_area": nuc_area,
                     "nuc_mean": nuc_mean,
                     "nuc_std": nuc_std,
-                    "nu_med": nuc_med,
+                    "nuc_med": nuc_med,
                     "soma_area": soma_area,
                     "soma_mean": soma_mean,
                     "soma_std": soma_std,
