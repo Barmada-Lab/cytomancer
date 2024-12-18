@@ -286,9 +286,9 @@ def cli_entry(
         case "none":
             pass
         case "max":
-            intensity = intensity.max("z")
+            intensity = intensity.max("z", skipna=True)
         case "sum":
-            intensity = intensity.sum("z")
+            intensity = intensity.sum("z", skipna=True)
 
     client = new_client_from_config(config)
     if (project := get_project(client, project_name)) is None:

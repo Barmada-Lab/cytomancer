@@ -164,9 +164,9 @@ def do_nuc_cyto(  # noqa: C901
         case "none":
             pass
         case "maximum_intensity":
-            intensity = intensity.max("z")
+            intensity = intensity.max("z", skipna=True)
         case "sum":
-            intensity = intensity.sum("z")
+            intensity = intensity.sum("z", skipna=True)
 
     upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
     if not upload_record_location.exists():
