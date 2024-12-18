@@ -65,14 +65,14 @@ def load_nd2_collection(base_path: pl.Path) -> xr.DataArray:
     max_y = max(nd2.sizes["y"] for nd2 in arrs)
 
     homogenized = []
-    for arr in arrs:
+    for nd2 in arrs:
         if nd2.sizes["y"] == max_y and nd2.sizes["x"] == max_x:
-            homogenized.append(arr)
+            homogenized.append(nd2)
             continue
 
         resized = xr.apply_ufunc(
             transform.resize,
-            arr,
+            nd2,
             input_core_dims=[["y", "x"]],
             output_core_dims=[["y", "x"]],
             dask="parallelized",
