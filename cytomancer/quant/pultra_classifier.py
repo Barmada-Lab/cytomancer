@@ -172,7 +172,7 @@ def do_train(
         client.close()
 
     if df is None:
-        return
+        return None
 
     X, y = prepare_labelled_data(df)
 

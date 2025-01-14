@@ -39,14 +39,14 @@ def run(
     pd.DataFrame
         DataFrame with segmentation results.
     """
-    assert (
-        experiment_dir.exists()
-    ), f"Could not find experiment directory at {experiment_dir}"
+    if not experiment_dir.exists():
+        print(f"Could not find experiment directory at {experiment_dir}")
+        return
 
-    results_subdir = experiment_dir / "results" / "stardist_nuc_seg"
-    results_subdir.mkdir(parents=True, exist_ok=True)
-    if any(results_subdir.glob("*.tif")):
-        for file in results_subdir.glob("*.tif"):
+    scratch_subdir = experiment_dir / "scratch" / "stardist_nuc_seg"
+    scratch_subdir.mkdir(parents=True, exist_ok=True)
+    if any(scratch_subdir.glob("*.tif")):
+        for file in scratch_subdir.glob("*.tif"):
             file.unlink()
 
     if (model := StarDist2D.from_pretrained(model_name)) is None:
@@ -78,7 +78,7 @@ def run(
     rows = [row for _, row in df[df["channel"] == "DAPI"].iterrows()]
 
     summary = []
-    preprocessing = {}
+    preprocessing: dict = {}
     while len(preprocessing) > 0 or len(rows) > 0:
         while len(preprocessing) < 100 and len(rows) > 0:
             coords = rows.pop()
@@ -96,7 +96,7 @@ def run(
 
             predictions, _ = model.predict_instances(img)  # type: ignore
             filename = uuid4().hex + ".tif"
-            tifffile.imwrite(results_subdir / filename, predictions, compression="lzw")
+            tifffile.imwrite(scratch_subdir / filename, predictions, compression="lzw")
             row_vals = coords.tolist() + [filename]
             summary.append(row_vals)
 
@@ -105,5 +105,5 @@ def run(
         dict(zip(row_keys, row_vals, strict=False)) for row_vals in summary
     ]
     output_df = pd.DataFrame.from_records(summary_records)
-    output_df.to_csv(results_subdir / "summary.csv", index=False)
-    CytoMeta(shape, "uint16").dump_json(results_subdir / "meta.json")
+    output_df.to_csv(scratch_subdir / "summary.csv", index=False)
+    CytoMeta(shape, "uint16").dump_json(scratch_subdir / "meta.json")

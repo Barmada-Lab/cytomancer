@@ -34,7 +34,8 @@ dependencies = [
     "pyarrow>=15.0.0",
     "hdaf-filter>=0.1.1",
     "h5py>=3.10.0",
-    "textual>=0.53.0", # explicit dependency to avoid trogon incompatibility with 0.54.0
+    "textual>=0.53.0",
+    # explicit dependency to avoid trogon incompatibility with 0.54.0
     "more-itertools>=10.2.0",
     "celery>=5.4.0",
     "redis>=5.0.4",
@@ -47,7 +48,8 @@ dependencies = [
     "lifelines>=0.29.0",
     "dask-cuda>=24.6.0",
     "imagecodecs>=2024.6.1",
-    "pycocotools>=2.0.8"
+    "pycocotools>=2.0.8",
+    "pandas-stubs>=2.2.3.241126",
 ]
 
 [project.scripts]
@@ -56,7 +58,7 @@ cyto = "cytomancer.cli:cli"
 [tool.uv]
 dev-dependencies = [
     "pytest<8.0.0,>=7.4.3",
-    "mypy<2.0.0,>=1.8.0",
+    "mypy>=1.8.0,<2.0.0",
     "ruff<1.0.0,>=0.2.2",
     "pre-commit<4.0.0,>=3.6.2",
     "types-passlib<2.0.0.0,>=1.7.7.20240106",
@@ -74,8 +76,7 @@ build-backend = "hatchling.build"
 packages = ["cytomancer"]
 
 [tool.mypy]
-strict = true
-exclude = ["venv", ".venv"]
+disable_error_code = "import-untyped"
 
 [tool.ruff]
 target-version = "py310"

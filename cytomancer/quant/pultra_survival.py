@@ -8,6 +8,7 @@ from dask.distributed import Worker, get_client
 from skimage.measure import regionprops
 from sklearn.pipeline import Pipeline
 
+from cytomancer import __version__
 from cytomancer.config import config
 from cytomancer.experiment import ExperimentType
 from cytomancer.io.cyto_dir import load_dir
@@ -118,11 +119,15 @@ def run(
     svm_model_path: Path,
     save_annotations: bool,
 ):
-    results_dir = experiment_path / "results"
-    seg_results_dir = results_dir / "stardist_nuc_seg"
+    scratch_dir = experiment_path / "scratch"
+    seg_results_dir = scratch_dir / "stardist_nuc_seg"
     assert (
         seg_results_dir.exists()
     ), "Nuclear segmentation results not found. Please run nuclear segmentation first."
+
+    analysis_dir = experiment_path / "analysis"
+    if not analysis_dir.exists():
+        analysis_dir.mkdir()
 
     client = get_client()
     logger.info(f"Connected to dask scheduler {client.scheduler}")
@@ -144,7 +149,9 @@ def run(
     client.register_worker_callbacks(init_logging)
 
     nuc_labels = load_dir(seg_results_dir).isel(y=slice(0, 1998), x=slice(0, 1998))
-    intensity = load_experiment(experiment_path, experiment_type)
+
+    acquisition_path = experiment_path / "acquisition"
+    intensity = load_experiment(acquisition_path, experiment_type)
 
     logger.debug(f"loading classifier from {svm_model_path}")
     if (classifier := load_classifier(svm_model_path)) is None:
@@ -152,9 +159,8 @@ def run(
 
     preds = process(intensity, nuc_labels, classifier)
 
-    print(preds)
     if save_annotations:
-        store_path = results_dir / "survival_processed.zarr"
+        store_path = analysis_dir / "survival_processed.zarr"
         preds["nuc_labels"] = nuc_labels
         preds.to_zarr(store_path, mode="w")
         preds = xr.open_zarr(store_path)
@@ -165,6 +171,7 @@ def run(
     ).dropna()
 
     df["count"] = df["count"].astype(int)
-    df.to_csv(results_dir / "survival.csv")
+    output_name = f"survival_{__version__}.csv"
+    df.to_csv(analysis_dir / output_name)
 
     logger.info(f"Finished analysis of {experiment_path}")
