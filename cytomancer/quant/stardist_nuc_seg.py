@@ -73,7 +73,7 @@ def run(
         equalized = equalize_adapthist(med, clip_limit=clahe_clip)
         return equalized
 
-    df, shape, attrs = get_experiment_df_detailed(experiment_dir)
+    df, shape, attrs = get_experiment_df_detailed(experiment_dir / "acquisition_data")
     df = df.reset_index()
     rows = [row for _, row in df[df["channel"] == "DAPI"].iterrows()]
 

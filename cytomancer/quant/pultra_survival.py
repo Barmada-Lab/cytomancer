@@ -150,7 +150,7 @@ def run(
 
     nuc_labels = load_dir(seg_results_dir).isel(y=slice(0, 1998), x=slice(0, 1998))
 
-    acquisition_path = experiment_path / "acquisition"
+    acquisition_path = experiment_path / "acquisition_data"
     intensity = load_experiment(acquisition_path, experiment_type)
 
     logger.debug(f"loading classifier from {svm_model_path}")

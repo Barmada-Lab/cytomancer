@@ -149,9 +149,10 @@ def do_train(
     dump_predictions: bool = False,
 ) -> Pipeline | None:
     client = new_client_from_config(config)
-    intensity = load_experiment(experiment_dir, experiment_type)
+    intensity = load_experiment(experiment_dir / "acquisition_data", experiment_type)
 
-    upload_record_location = experiment_dir / "results" / "cvat_upload.csv"
+    analysis_dir = experiment_dir / "analysis"
+    upload_record_location = analysis_dir / "cvat_upload.csv"
     if not upload_record_location.exists():
         raise FileNotFoundError(
             f"Upload record not found at {upload_record_location}! Are you sure you've uploaded using the latest version of cytomancer and provided the correct experiment folder?"
@@ -195,7 +196,7 @@ def do_train(
     logger.info(f"Pipeline score: {score}")
 
     if dump_predictions:
-        eval_path = experiment_dir / "results" / "classifier_eval.csv"
+        eval_path = experiment_dir / "analysis" / "classifier_eval.csv"
         X["prediction"] = pipe.predict(X)
         X["ground_truth"] = y
         X.to_csv(eval_path)

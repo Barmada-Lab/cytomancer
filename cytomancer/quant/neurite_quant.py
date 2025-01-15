@@ -41,14 +41,14 @@ def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):
 def run(
     experiment_path: Path, experiment_type: ExperimentType, ilastish_model_path: Path
 ):
-    experiment = load_experiment(experiment_path, experiment_type)
+    experiment = load_experiment(experiment_path / "acquisition_data", experiment_type)
     model = joblib.load(ilastish_model_path)
 
     skeletons = neurite_skeleseg(experiment, model)
 
     neurite_length = skeletons.sum(dim=["y", "x"])
 
-    results_dir = experiment_path / "results"
+    results_dir = experiment_path / "analysis"
     results_dir.mkdir(exist_ok=True)
 
     neurite_length.to_dataframe("neurite_length").to_csv(
