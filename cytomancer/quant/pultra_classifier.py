@@ -33,25 +33,22 @@ def _transform_arrs(df, labels=None):
     assert isinstance(df, pd.DataFrame), f"Expected DataFrame, got {type(df)}"
     assert df.columns.isin(
         ["objects", "gfp", "dapi"]
-    ).all(), f"Missing columns in input X-DataFrame; expected ['objects', 'gfp', 'rfp', 'dapi'], got {df.columns.values}"
+    ).all(), f"Missing columns in input X-DataFrame; expected ['objects', 'gfp', 'dapi'], got {df.columns.values}"
 
     for idx, field in df.iterrows():
         field = field.to_dict()
         objects = field["objects"]
         dapi = field["dapi"]
         gfp = field["gfp"]
-        # rfp = field["rfp"]
 
         dapi_median = np.median(dapi)
         gfp_median = np.median(gfp)
-        # rfp_median = np.median(rfp)
 
         for props in regionprops(objects):
             mask = objects == props.label
             feature_vec = {
                 "dapi_signal": np.mean(dapi[mask]) / dapi_median,
                 "gfp_signal": np.mean(gfp[mask]) / gfp_median,
-                # "rfp_signal": np.mean(rfp[mask]) / rfp_median,
                 "size": mask.sum(),
             }
 
@@ -119,7 +116,6 @@ def get_segmented_image_df(
         )
 
         gfp = subarr.sel(channel="GFP").values
-        # rfp = subarr.sel(channel="RFP").values
         dapi = subarr.sel(channel="DAPI").values
 
         live_labels = np.zeros_like(label_arr, dtype=bool)
@@ -132,7 +128,6 @@ def get_segmented_image_df(
                 "objects": obj_arr[annotation_frame_idx],
                 "labels": live_labels[annotation_frame_idx],
                 "gfp": gfp,
-                # "rfp": rfp,
                 "dapi": dapi,
             }
         )

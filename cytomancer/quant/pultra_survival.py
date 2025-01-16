@@ -24,23 +24,20 @@ DEAD = 2
 DAPI_SNR_THRESHOLD = 2
 
 
-def get_features(mask, dapi, gfp, rfp, field_medians):
+def get_features(mask, dapi, gfp, field_medians):
     dapi_signal = dapi[mask].mean() / field_medians[0]
     gfp_signal = gfp[mask].mean() / field_medians[1]
-    rfp_signal = rfp[mask].mean() / field_medians[2]
     size = mask.astype(int).sum()
     return {
         "dapi_signal": dapi_signal,
         "gfp_signal": gfp_signal,
-        "rfp_signal": rfp_signal,
         "size": size,
     }
 
 
-def predict(dapi, gfp, rfp, nuc_labels, classifier):
+def predict(dapi, gfp, nuc_labels, classifier):
     dapi_field_med = np.median(dapi)
     gfp_field_med = np.median(gfp)
-    rfp_field_med = np.median(rfp)
 
     preds = np.zeros_like(nuc_labels, dtype=np.uint8)
     for props in regionprops(nuc_labels):
@@ -51,9 +48,7 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
         if dapi_mean / dapi_field_med < DAPI_SNR_THRESHOLD:
             continue
 
-        features = get_features(
-            mask, dapi, gfp, rfp, [dapi_field_med, gfp_field_med, rfp_field_med]
-        )
+        features = get_features(mask, dapi, gfp, [dapi_field_med, gfp_field_med])
         df = pd.DataFrame.from_records([features])
         if classifier.predict(df)[0]:
             preds[mask] = LIVE
@@ -64,23 +59,20 @@ def predict(dapi, gfp, rfp, nuc_labels, classifier):
 
 
 def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipeline):
-    def process_field(
-        dapi: np.ndarray, gfp: np.ndarray, rfp: np.ndarray, nuc_labels: np.ndarray
-    ):
+    def process_field(dapi: np.ndarray, gfp: np.ndarray, nuc_labels: np.ndarray):
         if np.issubdtype(nuc_labels.dtype, np.floating):
             return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
 
-        if np.isnan(dapi).any() or np.isnan(gfp).any() or np.isnan(rfp).any():
+        if np.isnan(dapi).any() or np.isnan(gfp).any():
             return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
 
-        preds = predict(dapi, gfp, rfp, nuc_labels, classifier)
+        preds = predict(dapi, gfp, nuc_labels, classifier)
         return preds
 
     preds = xr.apply_ufunc(
         process_field,
         intensity.sel(channel="DAPI").drop_vars("channel"),
         intensity.sel(channel="GFP").drop_vars("channel"),
-        intensity.sel(channel="RFP").drop_vars("channel"),
         nuc_labels.sel(channel="DAPI").drop_vars("channel"),
         input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"], ["y", "x"]],
         output_core_dims=[["y", "x"]],
