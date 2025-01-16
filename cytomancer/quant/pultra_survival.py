@@ -74,7 +74,7 @@ def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipel
         intensity.sel(channel="DAPI").drop_vars("channel"),
         intensity.sel(channel="GFP").drop_vars("channel"),
         nuc_labels.sel(channel="DAPI").drop_vars("channel"),
-        input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"], ["y", "x"]],
+        input_core_dims=[["y", "x"], ["y", "x"], ["y", "x"]],
         output_core_dims=[["y", "x"]],
         vectorize=True,
         dask="parallelized",
