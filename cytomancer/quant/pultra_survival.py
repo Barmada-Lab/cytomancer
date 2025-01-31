@@ -1,11 +1,16 @@
 import logging
+import math
 from pathlib import Path
 
+import imageio
 import numpy as np
 import pandas as pd
 import xarray as xr
 from dask.distributed import Worker, get_client
+from skimage.exposure import rescale_intensity
 from skimage.measure import regionprops
+from skimage.segmentation import mark_boundaries
+from skimage.transform import resize
 from sklearn.pipeline import Pipeline
 
 from cytomancer import __version__
@@ -105,6 +110,45 @@ def quantify(nuc_labels: xr.DataArray, preds: xr.DataArray):
     ).squeeze("count", drop=True)
 
 
+def dump_gifs(intensity: xr.DataArray, nuc_labels: xr.DataArray, output_dir: Path):
+    gfp = intensity.sel(channel="GFP").drop_vars("channel")
+    N = math.ceil(math.sqrt(intensity.sizes["field"]))
+    for region in range(intensity.sizes["region"]):
+        gif_path = output_dir / f"region_{region}.gif"
+        tps = []
+        for time in range(intensity.sizes["time"]):
+            frames = []
+            for field in range(intensity.sizes["field"]):
+                gfp_field = gfp.isel(
+                    region=region, field=field, time=time
+                ).values.astype(np.uint8)
+                live = (
+                    nuc_labels.isel(region=region, field=field, time=time) == LIVE
+                ).values.astype(np.uint8)
+                dead = (
+                    nuc_labels.isel(region=region, field=field, time=time) == DEAD
+                ).values.astype(np.uint8)
+                marked = mark_boundaries(gfp_field, live, color=(0, 1, 0))
+                marked = mark_boundaries(marked, dead, color=(1, 0, 0))  # Red for dead
+                frames.append(marked)
+            mosaic = np.concatenate(
+                [
+                    np.concatenate([frames[i * N + j] for j in range(N)], axis=1)
+                    for i in range(N)
+                ],
+                axis=0,
+            )
+            tps.append(mosaic)
+
+        ts = [
+            rescale_intensity(
+                resize(frame, (1024, 1024), anti_aliasing=True), out_range="uint8"
+            )
+            for frame in tps
+        ]
+        imageio.mimsave(gif_path, ts, format="GIF", fps=1)  # type: ignore
+
+
 def run(
     experiment_path: Path,
     experiment_type: ExperimentType,
@@ -156,6 +200,15 @@ def run(
         preds["nuc_labels"] = nuc_labels
         preds.to_zarr(store_path, mode="w")
         preds = xr.open_zarr(store_path)
+
+        output_dir = scratch_dir / "gifs"
+        if not output_dir.exists():
+            output_dir.mkdir()
+        dump_gifs(
+            intensity,
+            preds["nuc_labels"].sel(channel="DAPI").drop_vars("channel"),
+            output_dir,
+        )
 
     quantified = quantify(nuc_labels, preds["preds"])
     df = quantified.to_dataframe(
