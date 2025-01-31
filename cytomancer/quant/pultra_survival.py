@@ -152,7 +152,7 @@ def run(
     preds = process(intensity, nuc_labels, classifier)
 
     if save_annotations:
-        store_path = analysis_dir / "survival_processed.zarr"
+        store_path = scratch_dir / "survival_processed.zarr"
         preds["nuc_labels"] = nuc_labels
         preds.to_zarr(store_path, mode="w")
         preds = xr.open_zarr(store_path)
