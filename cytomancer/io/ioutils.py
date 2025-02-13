@@ -5,7 +5,7 @@ import dask
 import dask.array as da
 import numpy as np
 import tifffile
-from skimage import exposure, transform  # type: ignore
+from skimage import transform  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def read_tiff_delayed(shape: tuple, reshape: bool = True):
                 raise ValueError(
                     f"Image shape {img.shape} does not match expected shape {shape}; you can pass reshape=True to resize the image to a standard shape."
                 )
-            return exposure.rescale_intensity(img, out_range=np.float32)
+            return img.astype(np.float32)
         except (ValueError, NameError, FileNotFoundError) as e:
             logger.warning(
                 f"Error reading {path}: {e}\nThis field will be filled based on surrounding fields and timepoints."
@@ -35,5 +35,5 @@ def read_tiff_delayed(shape: tuple, reshape: bool = True):
     return dask.delayed(read)
 
 
-def read_tiff_toarray(path: pl.Path, shape: tuple = (1024, 1024)):
+def read_tiff_toarray(path: pl.Path, shape: tuple = (2048, 2048)):
     return da.from_delayed(read_tiff_delayed(shape)(path), shape, dtype=np.float32)
