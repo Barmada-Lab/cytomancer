@@ -39,6 +39,13 @@ def broadcast_and_concat(
 
 
 @broadcast_and_concat
+def sum_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
+    measurement_name = "sum"
+    assert measurement_name in measurement_fn_lut
+    return pd.DataFrame.from_records([{measurement_name: np.sum(intensity[mask])}])
+
+
+@broadcast_and_concat
 def mean_roi(mask: np.ndarray, intensity: np.ndarray) -> pd.DataFrame:
     measurement_name = "mean"
     assert measurement_name in measurement_fn_lut
@@ -82,6 +89,7 @@ def measure(roi: Roi, intensity: xr.DataArray, measurement_names):
 
 
 measurement_fn_lut = {
+    "sum": sum_roi,
     "mean": mean_roi,
     "median": median_roi,
     "area": area_roi,
@@ -98,10 +106,11 @@ def measure_experiment(  # noqa: C901
     roi_set_name: str,
     measurement_names: set[str],
     z_projection_mode: str = "none",
-    roi_broadcasting: list[str] = None,
+    roi_broadcasting: list[str] | None = None,
 ):
     if roi_broadcasting is None:
         roi_broadcasting = []
+
     if not_supported := measurement_names - measurement_fn_lut.keys():
         raise ValueError(f"Invalid measurements: {not_supported}")
 

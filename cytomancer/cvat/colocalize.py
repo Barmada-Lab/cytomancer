@@ -108,12 +108,15 @@ def nuc_cyto(
                 nuc_area = nuc.sum()
                 soma_area = soma.sum()
                 cyto_area = cyto.sum()
+                nuc_sum = frame.values[nuc].sum()
                 nuc_mean = frame.values[nuc].mean()
                 nuc_std = frame.values[nuc].std()
                 nuc_med = np.median(frame.values[nuc])
+                soma_sum = frame.values[soma].sum()
                 soma_mean = frame.values[soma].mean()
                 soma_std = frame.values[soma].std()
                 soma_med = np.median(frame.values[soma])
+                cyto_sum = frame.values[cyto].sum()
                 cyto_mean = frame.values[cyto].mean()
                 cyto_std = frame.values[cyto].std()
                 cyto_med = np.median(frame.values[cyto])
@@ -121,14 +124,17 @@ def nuc_cyto(
                 measurement = {
                     "cell_id": cell_id,
                     "nuc_area": nuc_area,
+                    "nuc_sum": nuc_sum,
                     "nuc_mean": nuc_mean,
                     "nuc_std": nuc_std,
                     "nuc_med": nuc_med,
                     "soma_area": soma_area,
+                    "soma_sum": soma_sum,
                     "soma_mean": soma_mean,
                     "soma_std": soma_std,
                     "soma_med": soma_med,
                     "cyto_area": cyto_area,
+                    "cyto_sum": cyto_sum,
                     "cyto_mean": cyto_mean,
                     "cyto_std": cyto_std,
                     "cyto_med": cyto_med,
