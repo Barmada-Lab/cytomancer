@@ -1,6 +1,7 @@
 import pathlib as pl
 
 import dask.array as da
+import tifffile
 import xarray as xr
 
 from . import ioutils
@@ -18,6 +19,8 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
         region, field = path.name.split(".")[0].split("_")
         region_tags.add(region)
         field_tags.add(field)  # get rid of zero-padding
+
+    shape = tifffile.imread(next(base.glob("raw_imgs/**/*.tif"))).shape
 
     region_tags = sorted(region_tags)
     channel_tags = sorted(channel_tags)
@@ -43,7 +46,7 @@ def load_legacy(base: pl.Path, fillna: bool) -> xr.DataArray:
                         / f"col_{col}"
                         / f"{region}_{field}.tif"
                     )
-                    img = ioutils.read_tiff_toarray(path)
+                    img = ioutils.read_tiff_toarray(path, shape)
                     fields.append(img)
                 regions.append(da.stack(fields))
             timepoints.append(da.stack(regions))
@@ -80,6 +83,8 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
         region_tags.add(region)
         field_tags.add(field)  # get rid of zero-padding
 
+    shape = tifffile.imread(next(base.glob("raw_imgs/**/*.tif"))).shape
+
     region_tags = sorted(region_tags)
     channel_tags = sorted(channel_tags)
     field_tags = sorted(field_tags, key=lambda x: int(x))
@@ -104,7 +109,7 @@ def load_legacy_icc(base: pl.Path, fillna: bool) -> xr.DataArray:
                         / f"col_{col}"
                         / f"{region}_{field}.tif"
                     )
-                    img = ioutils.read_tiff_toarray(path)
+                    img = ioutils.read_tiff_toarray(path, shape)
                     fields.append(img)
                 regions.append(da.stack(fields))
             timepoints.append(da.stack(regions))
