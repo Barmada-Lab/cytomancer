@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from dask.distributed import Worker, get_client
-from skimage.exposure import rescale_intensity
+from skimage.exposure import rescale_intensity as skimage_rescale_intensity
 from skimage.measure import regionprops
 from skimage.segmentation import mark_boundaries
 from skimage.transform import resize
@@ -113,21 +113,29 @@ def quantify(nuc_labels: xr.DataArray, preds: xr.DataArray):
 def dump_gifs(intensity: xr.DataArray, nuc_labels: xr.DataArray, output_dir: Path):
     gfp = intensity.sel(channel="GFP").drop_vars("channel")
     N = math.ceil(math.sqrt(intensity.sizes["field"]))
-    for region in range(intensity.sizes["region"]):
+    for region in intensity["region"]:
         gif_path = output_dir / f"region_{region}.gif"
         tps = []
         for time in range(intensity.sizes["time"]):
             frames = []
             for field in range(intensity.sizes["field"]):
-                gfp_field = gfp.isel(
-                    region=region, field=field, time=time
-                ).values.astype(np.uint8)
+                gfp_field = (
+                    gfp.sel(region=region).isel(field=field, time=time).values,
+                )
+                gfp_field = resize(gfp_field, (512, 512))
+                gfp_field = skimage_rescale_intensity(gfp_field, out_range=np.uint8)
                 live = (
-                    nuc_labels.isel(region=region, field=field, time=time) == LIVE
-                ).values.astype(np.uint8)
+                    nuc_labels.sel(region=region).isel(field=field, time=time) == LIVE
+                )
+                live = resize(
+                    live, (512, 512), anti_aliasing=False, preserve_range=True
+                ).astype(np.uint8)
                 dead = (
-                    nuc_labels.isel(region=region, field=field, time=time) == DEAD
-                ).values.astype(np.uint8)
+                    nuc_labels.sel(region=region).isel(field=field, time=time) == DEAD
+                )
+                dead = resize(
+                    dead, (512, 512), anti_aliasing=False, preserve_range=True
+                ).astype(np.uint8)
                 marked = mark_boundaries(gfp_field, live, color=(0, 1, 0))
                 marked = mark_boundaries(marked, dead, color=(1, 0, 0))  # Red for dead
                 frames.append(marked)
@@ -140,13 +148,7 @@ def dump_gifs(intensity: xr.DataArray, nuc_labels: xr.DataArray, output_dir: Pat
             )
             tps.append(mosaic)
 
-        ts = [
-            rescale_intensity(
-                resize(frame, (1024, 1024), anti_aliasing=True), out_range="uint8"
-            )
-            for frame in tps
-        ]
-        imageio.mimsave(gif_path, ts, format="GIF", fps=1)  # type: ignore
+        imageio.mimsave(gif_path, tps, format="GIF", fps=1)  # type: ignore
 
 
 def run(
