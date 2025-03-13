@@ -1,5 +1,4 @@
 import logging
-import uuid
 from pathlib import Path
 
 import dask
@@ -41,28 +40,22 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
         path = row["path"]
         fields_dict = dict(zip(axes, coords, strict=False))
 
-        fields_dict["region_field_key"] = "-".join(
-            map(str, [fields_dict["region"], fields_dict["field"], fields_dict["z"]])
-        )
-        fields_dict["time_stack_key"] = "-".join(
-            map(
-                str,
-                [
-                    fields_dict["region"],
-                    fields_dict["field"],
-                    fields_dict["z"],
-                    fields_dict["channel"],
-                ],
-            )
-        )
+        region = fields_dict["region"]
+        field = fields_dict["field"]
+        z = fields_dict["z"]
+        time = fields_dict["time"]
+        channel = fields_dict["channel"]
+
+        fields_dict["region_field_key"] = "-".join(map(str, [region, field, z]))
+        fields_dict["time_stack_key"] = "-".join(map(str, [region, field, z, channel]))
         fields_dict["channel_stack_key"] = "-".join(
             map(
                 str,
                 [
-                    fields_dict["region"],
-                    fields_dict["field"],
-                    fields_dict["z"],
-                    fields_dict["time"],
+                    region,
+                    field,
+                    z,
+                    time,
                 ],
             )
         )
@@ -70,10 +63,10 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
             map(
                 str,
                 [
-                    fields_dict["region"],
-                    fields_dict["field"],
-                    fields_dict["time"],
-                    fields_dict["channel"],
+                    region,
+                    field,
+                    time,
+                    channel,
                 ],
             )
         )
@@ -81,7 +74,8 @@ def ingest_experiment_df(dataset: fo.Dataset, df: pd.DataFrame):
         arr = tifffile.imread(path)
         rescaled = exposure.rescale_intensity(arr, out_range="uint8")
         image = Image.fromarray(rescaled)
-        png_path = media_dir / f"{uuid.uuid4()}.png"
+        filename = f"T{time}_C{channel}_R{region}_F{field}_Z{z}.png"
+        png_path = media_dir / filename
         image.save(png_path, format="PNG")
 
         return (path, png_path, fields_dict)
