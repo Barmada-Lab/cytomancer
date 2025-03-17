@@ -119,25 +119,30 @@ def dump_gifs(intensity: xr.DataArray, nuc_labels: xr.DataArray, output_dir: Pat
         for time in range(intensity.sizes["time"]):
             frames = []
             for field in range(intensity.sizes["field"]):
-                gfp_field = (
-                    gfp.sel(region=region).isel(field=field, time=time).values,
-                )
-                gfp_field = resize(gfp_field, (512, 512))
+                gfp_field = gfp.sel(region=region).isel(field=field, time=time).values
+                gfp_field = resize(gfp_field, output_shape=(512, 512))
                 gfp_field = skimage_rescale_intensity(gfp_field, out_range=np.uint8)
                 live = (
                     nuc_labels.sel(region=region).isel(field=field, time=time) == LIVE
                 )
                 live = resize(
-                    live, (512, 512), anti_aliasing=False, preserve_range=True
+                    live,
+                    output_shape=(512, 512),
+                    anti_aliasing=False,
+                    preserve_range=True,
                 ).astype(np.uint8)
                 dead = (
                     nuc_labels.sel(region=region).isel(field=field, time=time) == DEAD
                 )
                 dead = resize(
-                    dead, (512, 512), anti_aliasing=False, preserve_range=True
+                    dead,
+                    output_shape=(512, 512),
+                    anti_aliasing=False,
+                    preserve_range=True,
                 ).astype(np.uint8)
                 marked = mark_boundaries(gfp_field, live, color=(0, 1, 0))
                 marked = mark_boundaries(marked, dead, color=(1, 0, 0))  # Red for dead
+                marked = skimage_rescale_intensity(marked, out_range=np.uint8)
                 frames.append(marked)
             mosaic = np.concatenate(
                 [
