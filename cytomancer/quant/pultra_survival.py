@@ -114,7 +114,7 @@ def dump_gifs(intensity: xr.DataArray, nuc_labels: xr.DataArray, output_dir: Pat
     gfp = intensity.sel(channel="GFP").drop_vars("channel")
     N = math.ceil(math.sqrt(intensity.sizes["field"]))
     for region in intensity["region"]:
-        gif_path = output_dir / f"region_{region}.gif"
+        gif_path = output_dir / f"region_{region.values}.gif"
         tps = []
         for time in range(intensity.sizes["time"]):
             frames = []

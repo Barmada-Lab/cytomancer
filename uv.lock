@@ -749,7 +749,7 @@ wheels = [
 
 [[package]]
 name = "cytomancer"
-version = "1.3.31"
+version = "1.3.32"
 source = { editable = "." }
 dependencies = [
     { name = "bokeh" },
