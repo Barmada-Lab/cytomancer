@@ -848,8 +848,8 @@ requires-dist = [
     { name = "scikit-image", specifier = ">=0.19.3" },
     { name = "scikit-learn", specifier = "==1.4.0" },
     { name = "scipy", specifier = ">=1.14.0" },
-    { name = "stardist", specifier = "==0.8.5" },
-    { name = "tensorflow", specifier = "==2.15.1" },
+    { name = "stardist", specifier = ">=0.9.1" },
+    { name = "tensorflow", specifier = ">=2.15.1" },
     { name = "textual", specifier = ">=0.53.0" },
     { name = "tifffile", specifier = ">=2023.7.18" },
     { name = "toolz", specifier = ">=0.12.0" },
@@ -1548,7 +1548,7 @@ name = "importlib-metadata"
 version = "8.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.12'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cd/12/33e59336dca5be0c398a7482335911a33aa0e20776128f038019f1a95f1b/importlib_metadata-8.5.0.tar.gz", hash = "sha256:71522656f0abace1d072b9e5481a48f07c138e00f079c38c8f883823f9c26bd7", size = 55304 }
 wheels = [
@@ -3768,7 +3768,7 @@ wheels = [
 
 [[package]]
 name = "stardist"
-version = "0.8.5"
+version = "0.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "csbdeep" },
@@ -3776,12 +3776,16 @@ dependencies = [
     { name = "numba" },
     { name = "scikit-image" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/bf/c06fb4b6ea23eb7279e5574252f17284d889cbfdc28528133a6fb2ce0818/stardist-0.8.5.tar.gz", hash = "sha256:260a31df86ca711e5e98cb91597c6cb9a10dcd1dc3c6b826d41b7c73c9646a1e", size = 885559 }
+sdist = { url = "https://files.pythonhosted.org/packages/1f/99/f1d73061a663bfa66d92fcf6d4d696cc1a64a5d23be8f8667aecbe2490fe/stardist-0.9.1.tar.gz", hash = "sha256:fc96e8da35b49ac1e8990e2c15fecf129e5161fae9dfe17cb7b85a026163fbd5", size = 888249 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/41/57/8db1558ef2fd40e262bc465b92aa5913c1748eb1a046d0a93d904624d7cd/stardist-0.8.5-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:77d3df4fabe0e9bf08ab9df53e1e9717af815b437f24bccf12f404c51a7e3379", size = 1175994 },
-    { url = "https://files.pythonhosted.org/packages/22/36/4000857c3bc914f0f9a32da3820148ac01c931b5e1230ab1eb1f422cb3ee/stardist-0.8.5-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:03dbd485014dcc19ba250c7fb378ff5ad048405a96f5a00b0210f8d6608bb96a", size = 854411 },
-    { url = "https://files.pythonhosted.org/packages/33/19/bb55679ea84c886057491055e0080d38dc3b452fea6c07ceea351367d5c6/stardist-0.8.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ca630048563ff90470f72d68d47bd83148fed839d99820d43eccf1ae8a061ec3", size = 3049591 },
-    { url = "https://files.pythonhosted.org/packages/83/65/75362b87d359ed4651498da186833f32877dd06967073a67b63bcd77ff47/stardist-0.8.5-cp311-cp311-win_amd64.whl", hash = "sha256:7bb1c9982e0a12dede1afddb166d6416d10b68f8b66b0b3b1bcc66fa9eb1b343", size = 807254 },
+    { url = "https://files.pythonhosted.org/packages/89/69/e486bf5b662c88e027936a96538d3657cff41353e7718b4bb4db404aeb36/stardist-0.9.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:da0f5a4be2140ff974b1dc9d51e57431cfe258800dca28cdcf28bb78c1163e59", size = 1167235 },
+    { url = "https://files.pythonhosted.org/packages/9e/3f/40719f6cda755785954ff7ab99b4235284f2cd4ebb648c0236175cfac39b/stardist-0.9.1-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:dbff43119ef3e73f665bac08a37bd75715642cf3b8addc24bc8a0efeccc0b85a", size = 1086233 },
+    { url = "https://files.pythonhosted.org/packages/9c/7b/19cdd1829523426dd45f4624d6e836834c0c8b91510df2c10520814ac918/stardist-0.9.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1f2caf3a071c1ead1b0cbbf9614ff2c82967be1bd22764f097871fb9bbd2718f", size = 3051625 },
+    { url = "https://files.pythonhosted.org/packages/92/6c/83f4a3ae69fc7eb6f145e86c02500f47cc429f9cc845ce570e33a2dbc4cb/stardist-0.9.1-cp311-cp311-win_amd64.whl", hash = "sha256:6cdd0e9902489724b3b00082ff4c05775cb4b82feb971814b9ca141eee162d8a", size = 786064 },
+    { url = "https://files.pythonhosted.org/packages/8d/94/daf45462e9bb10e92794a38bd61648b4e972bc28c3816fabb75884188ee4/stardist-0.9.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:1ac81239ac04cc8e06dcac47e2c93f103d318d2d2c788483336211bacbbd0634", size = 1167458 },
+    { url = "https://files.pythonhosted.org/packages/85/5b/02b076f75cbff4910be28a3f73f315a4548c385b9107b5f88f82ae3cd633/stardist-0.9.1-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:0aebe9cedb0ba19cb13e23900393b5e890476031a7784a5abc4b34cc87393195", size = 1086422 },
+    { url = "https://files.pythonhosted.org/packages/30/cf/7d964a93ca6ef9a3182924a7a85aba08209fb316a411cb058d76043e9b5f/stardist-0.9.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:cb64b8eb63813ad20a3cb61a605bdbf6072932571818ed20f71ac630c13d3cd8", size = 3051989 },
+    { url = "https://files.pythonhosted.org/packages/20/35/b27f306745edb2e53614fb4a4dbfe9062598f5d4063d4979c8ad1c2b8606/stardist-0.9.1-cp312-cp312-win_amd64.whl", hash = "sha256:07b0c174eea6edacff7113a3eb4a5e7144fe7e3d838b56a46168e9d38f6cb19d", size = 786158 },
 ]
 
 [[package]]
