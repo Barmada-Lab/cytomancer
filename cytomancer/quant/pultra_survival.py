@@ -213,7 +213,7 @@ def run(
             output_dir.mkdir()
         dump_gifs(
             intensity,
-            preds["nuc_labels"].sel(channel="DAPI").drop_vars("channel"),
+            preds["preds"],
             output_dir,
         )
 
