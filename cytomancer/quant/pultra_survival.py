@@ -47,11 +47,6 @@ def predict(dapi, gfp, nuc_labels, classifier):
     preds = np.zeros_like(nuc_labels, dtype=np.uint8)
     for props in regionprops(nuc_labels):
         mask = nuc_labels == props.label
-        dapi_mean = dapi[mask].mean()
-
-        # filter dim objects
-        if dapi_mean / dapi_field_med < DAPI_SNR_THRESHOLD:
-            continue
 
         features = get_features(mask, dapi, gfp, [dapi_field_med, gfp_field_med])
         df = pd.DataFrame.from_records([features])
