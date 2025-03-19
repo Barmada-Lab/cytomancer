@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 LIVE = 1
 DEAD = 2
 
-DAPI_SNR_THRESHOLD = 2
-
 
 def get_features(mask, dapi, gfp, field_medians):
     dapi_signal = dapi[mask].mean() / field_medians[0]
@@ -40,15 +38,21 @@ def get_features(mask, dapi, gfp, field_medians):
     }
 
 
-def predict(dapi, gfp, nuc_labels, classifier):
-    dapi_field_med = np.median(dapi)
+def predict(dapi, gfp, nuc_labels, classifier, snr_threshold):
+    background = nuc_labels == 0
+    dapi_background_med = np.median(dapi[background])
     gfp_field_med = np.median(gfp)
 
     preds = np.zeros_like(nuc_labels, dtype=np.uint8)
     for props in regionprops(nuc_labels):
         mask = nuc_labels == props.label
+        dapi_mean = dapi[mask].mean()
 
-        features = get_features(mask, dapi, gfp, [dapi_field_med, gfp_field_med])
+        # filter dim objects
+        if dapi_mean / dapi_background_med < snr_threshold:
+            continue
+
+        features = get_features(mask, dapi, gfp, [dapi_background_med, gfp_field_med])
         df = pd.DataFrame.from_records([features])
         if classifier.predict(df)[0]:
             preds[mask] = LIVE
@@ -58,7 +62,12 @@ def predict(dapi, gfp, nuc_labels, classifier):
     return preds
 
 
-def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipeline):
+def process(
+    intensity: xr.DataArray,
+    nuc_labels: xr.DataArray,
+    classifier: Pipeline,
+    snr_threshold: float,
+):
     def process_field(dapi: np.ndarray, gfp: np.ndarray, nuc_labels: np.ndarray):
         if np.issubdtype(nuc_labels.dtype, np.floating):
             return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
@@ -66,7 +75,7 @@ def process(intensity: xr.DataArray, nuc_labels: xr.DataArray, classifier: Pipel
         if np.isnan(dapi).any() or np.isnan(gfp).any():
             return np.full_like(dapi, np.iinfo(np.uint8).max, dtype=np.uint8)
 
-        preds = predict(dapi, gfp, nuc_labels, classifier)
+        preds = predict(dapi, gfp, nuc_labels, classifier, snr_threshold)
         return preds
 
     preds = xr.apply_ufunc(
@@ -156,6 +165,7 @@ def run(
     experiment_type: ExperimentType,
     svm_model_path: Path,
     save_annotations: bool,
+    snr_threshold: float,
 ):
     scratch_dir = experiment_path / "scratch"
     seg_results_dir = scratch_dir / "stardist_nuc_seg"
@@ -195,7 +205,7 @@ def run(
     if (classifier := load_classifier(svm_model_path)) is None:
         raise ValueError(f"Could not load classifier model at path {svm_model_path}")
 
-    preds = process(intensity, nuc_labels, classifier)
+    preds = process(intensity, nuc_labels, classifier, snr_threshold)
 
     if save_annotations:
         store_path = scratch_dir / "survival_processed.zarr"
