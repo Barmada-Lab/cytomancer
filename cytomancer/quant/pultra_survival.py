@@ -91,6 +91,8 @@ def process(
         output_dtypes=[np.uint8],
     )
 
+    preds.attrs["dead_label"] = DEAD
+    preds.attrs["live_label"] = LIVE
     return xr.Dataset({"preds": preds})
 
 
