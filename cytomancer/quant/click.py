@@ -129,13 +129,36 @@ def neurite_quant(
     run_neurite_quant.delay(str(experiment_dir), experiment_type, str(model_path))
 
 
-@click.command("stardist-nuc-seg")
+@click.command("stardist-seg")
 @experiment_dir_argument()
-def stardist_nuc_seg(experiment_dir: Path):
-    from cytomancer.quant.stardist_nuc_seg import run
+@click.option(
+    "--model-name",
+    type=str,
+    default="2D_versatile_fluo",
+    show_default=True,
+    help="Name of pretrained StarDist model to use.",
+)
+@click.option(
+    "--preprocess-method",
+    type=click.Choice(["punctate", "none"]),
+    default="punctate",
+    show_default=True,
+    help="Name of preprocessing method to use.",
+)
+@click.option(
+    "--clahe-clip",
+    type=float,
+    default=0.01,
+    show_default=True,
+    help="CLAHE clip limit. Used for image normalization.",
+)
+def stardist_nuc_seg(
+    experiment_dir: Path, model_name: str, preprocess_method: str, clahe_clip: float
+):
+    from cytomancer.quant.stardist_seg import run
 
     with dask_client():
-        run(experiment_dir)
+        run(experiment_dir, model_name, preprocess_method, clahe_clip)
 
 
 def register(cli: click.Group):

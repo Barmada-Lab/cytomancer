@@ -11,15 +11,28 @@ from skimage.filters import rank
 from skimage.morphology import disk
 from stardist.models import StarDist2D
 
+from cytomancer.config import config
 from cytomancer.io.cq1_loader import get_experiment_df_detailed
 from cytomancer.io.cyto_dir import CytoMeta
 
 logger = logging.getLogger(__name__)
 
 
+def punctate_preprocess(image: np.ndarray) -> np.ndarray:
+    footprint = disk(5)
+    rescaled = rescale_intensity(image, out_range="uint8")
+    med = rank.median(rescaled, footprint=footprint)
+    return med
+
+
+def none_preprocess(image: np.ndarray) -> np.ndarray:
+    return image
+
+
 def run(
     experiment_dir: Path,
     model_name: str = "2D_versatile_fluo",
+    preprocess_method: str = "punctate",
     clahe_clip: float = 0.01,
 ):  # noqa: C901
     """
@@ -39,6 +52,15 @@ def run(
     pd.DataFrame
         DataFrame with segmentation results.
     """
+
+    match preprocess_method:
+        case "punctate":
+            preprocess_fn = punctate_preprocess
+        case "none":
+            preprocess_fn = none_preprocess
+        case _:
+            raise ValueError(f"Unknown preprocess method: {preprocess_method}")
+
     if not experiment_dir.exists():
         print(f"Could not find experiment directory at {experiment_dir}")
         return
@@ -49,31 +71,36 @@ def run(
         for file in scratch_subdir.glob("*.tif"):
             file.unlink()
 
-    if (model := StarDist2D.from_pretrained(model_name)) is None:
-        raise ValueError(f"Failed to load model {model_name}")
+    if model_name in ["2d_versatile_fluo"]:
+        model = StarDist2D.from_pretrained(model_name)
+    else:
+        model = StarDist2D(
+            None, name=model_name, basedir=config.models_dir / "stardist"
+        )
 
     client = get_client()
 
     def load_and_preprocess(path):
         if path is None:
             logger.warning(
-                "MeasurementResult.ome.xml is missing an image. This is likely the result of an acquisition error! Replacing with NaNs..."
+                "MeasurementResult.ome.xml is missing an image. This is likely "
+                "the result of an acquisition error! Replacing with NaNs..."
             )
             return np.full((1, 1), np.nan)
         elif not path.exists():
             logger.warning(
-                f"Could not find image at {path}, even though its existence is recorded in MeasurementResult.ome.xml. The file may have been moved or deleted. Replacing with NaNs..."
+                f"Could not find image at {path}, even though its existence "
+                "is recorded in MeasurementResult.ome.xml. The file may have "
+                "been moved or deleted. Replacing with NaNs..."
             )
             return np.full((1, 1), np.nan)
-        image = tifffile.imread(path).astype(np.float16)[:1998, :1998]
 
-        footprint = disk(5)
-        rescaled = rescale_intensity(image, out_range="uint8")
-        med = rank.median(rescaled, footprint=footprint)
-        equalized = equalize_adapthist(med, clip_limit=clahe_clip)
+        image = tifffile.imread(path).astype(np.float16)[:1998, :1998]
+        preprocessed = preprocess_fn(image)
+        equalized = equalize_adapthist(preprocessed, clip_limit=clahe_clip)
         return equalized
 
-    df, shape, attrs = get_experiment_df_detailed(experiment_dir / "acquisition_data")
+    df, shape, _ = get_experiment_df_detailed(experiment_dir / "acquisition_data")
     df = df.reset_index()
     rows = [row for _, row in df[df["channel"] == "DAPI"].iterrows()]
 

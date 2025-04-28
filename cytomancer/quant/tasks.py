@@ -12,6 +12,7 @@ def run_pultra_survival(
     experiment_type: ExperimentType,
     svm_model_path: str,
     save_annotations: bool,
+    snr_threshold: float,
 ):
     from .pultra_survival import run
 
@@ -21,6 +22,7 @@ def run_pultra_survival(
             experiment_type,
             Path(svm_model_path),
             save_annotations,
+            snr_threshold,
         )
 
 
