@@ -126,7 +126,7 @@ def neurite_quant(
 
     from cytomancer.quant.tasks import run_neurite_quant
 
-    run_neurite_quant.delay(str(experiment_dir), experiment_type, str(model_path))
+    run_neurite_quant(str(experiment_dir), experiment_type, str(model_path))
 
 
 @click.command("stardist-seg")
@@ -170,4 +170,4 @@ def register(cli: click.Group):
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
-    # quant_group.add_command(neurite_quant)
+    quant_group.add_command(neurite_quant)
