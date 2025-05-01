@@ -1,8 +1,7 @@
 from pathlib import Path
 
 import click
-
-from cytomancer.experiment import ExperimentType
+from acquisition_io import ExperimentType
 
 
 def experiment_dir_argument(**kwargs):

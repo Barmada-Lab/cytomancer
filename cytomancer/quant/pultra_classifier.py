@@ -5,6 +5,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import xarray as xr
+from acquisition_io import ExperimentType, load_experiment
 from cvat_sdk import Client
 from skimage.measure import regionprops
 from sklearn.model_selection import cross_val_score, train_test_split
@@ -19,8 +20,6 @@ from cytomancer.cvat.helpers import (
     new_client_from_config,
 )
 from cytomancer.cvat.nuc_cyto_legacy import get_obj_arr_and_labels
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment
 
 logger = logging.getLogger(__name__)
 

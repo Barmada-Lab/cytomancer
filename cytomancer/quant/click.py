@@ -3,11 +3,11 @@ from pathlib import Path
 
 import click
 import joblib
+from acquisition_io import ExperimentType
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
 from cytomancer.dask import dask_client
-from cytomancer.experiment import ExperimentType
 
 logger = logging.getLogger(__name__)
 

@@ -3,13 +3,12 @@ from pathlib import Path
 import click
 import numpy as np
 import tifffile
+from acquisition_io import ExperimentType, load_experiment
 from tqdm import tqdm
 from xarray import DataArray
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
-from cytomancer.experiment import ExperimentType
 from cytomancer.ops.display import apply_psuedocolor
-from cytomancer.utils import load_experiment
 
 from ..utils import iter_idx_prod
 

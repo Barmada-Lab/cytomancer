@@ -3,13 +3,12 @@ from pathlib import Path
 import joblib
 import numpy as np
 import xarray as xr
+from acquisition_io import ExperimentType, load_experiment
 from skimage.measure import label, regionprops
 from skimage.morphology import skeletonize
 from sklearn.pipeline import Pipeline
 
-from cytomancer.experiment import ExperimentType
 from cytomancer.oneoffs import ilastish_seg_model
-from cytomancer.utils import load_experiment
 
 
 def neurite_skeleseg(experiment: xr.DataArray, model: Pipeline):

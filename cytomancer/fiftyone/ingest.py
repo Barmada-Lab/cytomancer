@@ -5,13 +5,13 @@ import dask
 import fiftyone as fo
 import pandas as pd
 import tifffile
+from acquisition_io.loaders import cq1_loader
 from distributed import as_completed, get_client
 from PIL import Image
 from skimage import exposure  # type: ignore
 from tqdm import tqdm
 
 from cytomancer.config import config
-from cytomancer.io import cq1_loader
 
 logger = logging.getLogger(__name__)
 

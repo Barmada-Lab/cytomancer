@@ -6,6 +6,7 @@ import imageio
 import numpy as np
 import pandas as pd
 import xarray as xr
+from acquisition_io import ExperimentType, load_experiment
 from dask.distributed import Worker, get_client
 from skimage.exposure import rescale_intensity as skimage_rescale_intensity
 from skimage.measure import regionprops
@@ -15,9 +16,7 @@ from sklearn.pipeline import Pipeline
 
 from cytomancer import __version__
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType
 from cytomancer.io.cyto_dir import load_dir
-from cytomancer.utils import load_experiment
 
 from .pultra_classifier import load_classifier
 

@@ -5,10 +5,10 @@ from pathlib import Path
 
 import click
 import fiftyone as fo
+from acquisition_io import ExperimentType
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.dask import dask_client
-from cytomancer.experiment import ExperimentType
 
 from .import_survival import do_import_survival
 from .ingest import do_ingest_cq1

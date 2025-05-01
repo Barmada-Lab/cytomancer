@@ -45,7 +45,7 @@ def clahe(arr: xr.DataArray, clip_limit: float):
 
 def apply_psuedocolor(arr: xr.DataArray) -> xr.DataArray:
     def _get_float_color(hexcode: str):
-        rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))
+        rgb = tuple(map(float, ImageColor.getcolor(hexcode, "RGB")))  # type: ignore[arg-type]
         max_val = max(rgb)
         rgb_corrected = tuple(x / max_val for x in rgb)
         return rgb_corrected

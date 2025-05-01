@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import click
+from acquisition_io import ExperimentType, load_experiment
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config

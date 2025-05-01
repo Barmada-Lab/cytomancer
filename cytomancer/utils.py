@@ -1,4 +1,3 @@
-import pathlib as pl
 import random
 from collections.abc import Generator
 from itertools import product
@@ -6,29 +5,7 @@ from typing import TypeVar
 
 import xarray as xr
 
-from cytomancer.experiment import ExperimentType
-from cytomancer.io.cq1_loader import load_cq1
-from cytomancer.io.legacy_loader import load_legacy, load_legacy_icc
-from cytomancer.io.lux_loader import load_lux
-from cytomancer.io.nd2_loader import load_nd2_collection
-
 T = TypeVar("T", xr.DataArray, xr.Dataset)
-
-
-def load_experiment(
-    path: pl.Path, experiment_type: ExperimentType, fillna: bool = False
-) -> xr.DataArray:
-    match experiment_type:
-        case ExperimentType.LEGACY:
-            return load_legacy(path, fillna)
-        case ExperimentType.LEGACY_ICC:
-            return load_legacy_icc(path, fillna)
-        case ExperimentType.ND2:
-            return load_nd2_collection(path)
-        case ExperimentType.LUX:
-            return load_lux(path, fillna)
-        case ExperimentType.CQ1:
-            return load_cq1(path)
 
 
 def apply_ufunc_xy(func, arr: xr.DataArray, ufunc_kwargs=None, **kwargs):

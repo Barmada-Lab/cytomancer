@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import click
+from acquisition_io import ExperimentType
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
-from cytomancer.experiment import ExperimentType
 
 
 @click.command("stardist-seg-cvat-proj")

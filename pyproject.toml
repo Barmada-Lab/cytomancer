@@ -3,7 +3,7 @@ name = "cytomancer"
 version = "1.3.36"
 description= "Tools for cellular divination"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.3.0",
     "pydantic-settings>=2.2.1",
@@ -23,9 +23,8 @@ dependencies = [
     "ome-types>=0.5.0",
     "Pillow>=10.1.0",
     "xarray>=2023.9.0",
-    "dask==2024.5.1",
-    "distributed==2024.5.1",
-    "dask-image>=2023.8.1",
+    "dask==2025.3.0",
+    "distributed==2025.3.0",
     "bokeh>=3.3.0",
     "bottleneck>=1.3.7",
     "pystackreg>=0.2.6",
@@ -46,10 +45,10 @@ dependencies = [
     "zarr<3.0.0",
     "scipy>=1.14.0",
     "lifelines>=0.29.0",
-    "dask-cuda>=24.6.0",
     "imagecodecs>=2024.6.1",
     "pycocotools>=2.0.8",
     "pandas-stubs>=2.2.3.241126",
+    "acquisition-io",
 ]
 
 [project.scripts]
@@ -67,6 +66,9 @@ dev-dependencies = [
     "ipykernel>=6.29.5",
     "ipympl>=0.9.4",
 ]
+
+[tool.uv.sources]
+acquisition-io = { git = "https://github.com/Barmada-Lab/acquisition-io", rev = "v0.1.6" }
 
 [build-system]
 requires = ["hatchling"]

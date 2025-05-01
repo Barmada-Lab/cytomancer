@@ -1,8 +1,9 @@
 from pathlib import Path
 
+from acquisition_io import ExperimentType
+
 from cytomancer.celery import CytomancerTask, app
 from cytomancer.dask import dask_client
-from cytomancer.experiment import ExperimentType
 
 
 @app.task(bind=True)

@@ -8,11 +8,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xarray as xr
+from acquisition_io import ExperimentType, load_experiment
 from pycocotools.coco import COCO
 
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import iter_idx_prod, load_experiment
+from cytomancer.utils import iter_idx_prod
 
 logger = logging.getLogger(__name__)
 

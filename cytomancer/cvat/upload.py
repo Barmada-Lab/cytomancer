@@ -8,12 +8,12 @@ from pathlib import Path
 import pandas as pd
 import tifffile
 import xarray as xr
+from acquisition_io import ExperimentType, load_experiment
 from cvat_sdk.models import TaskWriteRequest
 
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType
 from cytomancer.ops.display import apply_psuedocolor, clahe, rescale_intensity
-from cytomancer.utils import iter_idx_prod, load_experiment
+from cytomancer.utils import iter_idx_prod
 
 from .helpers import (
     create_project,

@@ -5,6 +5,7 @@ from uuid import uuid4
 import numpy as np
 import pandas as pd
 import tifffile
+from acquisition_io.loaders.cq1_loader import get_experiment_df_detailed
 from distributed import get_client, wait
 from skimage.exposure import equalize_adapthist, rescale_intensity
 from skimage.filters import rank
@@ -12,7 +13,6 @@ from skimage.morphology import disk
 from stardist.models import StarDist2D
 
 from cytomancer.config import config
-from cytomancer.io.cq1_loader import get_experiment_df_detailed
 from cytomancer.io.cyto_dir import CytoMeta
 
 logger = logging.getLogger(__name__)

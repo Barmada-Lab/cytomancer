@@ -1,7 +1,8 @@
 from pathlib import Path
 
+from acquisition_io import ExperimentType
+
 from cytomancer.celery import CytomancerTask, app
-from cytomancer.experiment import ExperimentType
 
 
 @app.task(bind=True)

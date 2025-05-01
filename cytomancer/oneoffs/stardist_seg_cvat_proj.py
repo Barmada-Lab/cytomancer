@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+from acquisition_io import ExperimentType, load_experiment
 from cvat_sdk.models import LabeledShapeRequest, ShapeType, TaskAnnotationsUpdateRequest
 from skimage import exposure, filters, morphology  # type: ignore
 from stardist.models import StarDist2D
@@ -12,8 +13,6 @@ from cytomancer.cvat.helpers import (
     get_rles,
     new_client_from_config,
 )
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment
 
 
 def run(
