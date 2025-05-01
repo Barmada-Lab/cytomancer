@@ -31,9 +31,6 @@ class CytomancerConfig(BaseSettings):
     # Path to scratch storage -- stores bulk quantities of temporary data
     scratch_dir: Path = Path("/data/scratch")
 
-    #  Url of celery broker; probably a redis instance
-    celery_broker_url: str = "redis://localhost:6379"
-
     dask_n_workers: int = 8
 
     dask_threads_per_worker: int = 2

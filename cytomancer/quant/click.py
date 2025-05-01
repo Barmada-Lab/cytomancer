@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
     "--save-annotations", is_flag=True, help="Save annotated stacks to results folder"
 )
 @click.option(
-    "--run-sync",
-    is_flag=True,
-    help="Run the task synchronously, skipping the task queue.",
-)
-@click.option(
     "--snr-thresh",
     type=float,
     default=2,
@@ -38,7 +33,6 @@ def pultra_survival(
     experiment_dir: Path,
     classifier_name,
     save_annotations: bool,
-    run_sync: bool,
     snr_thresh: float,
 ):
     """
@@ -46,22 +40,15 @@ def pultra_survival(
     """
     svm_path = config.models_dir / classifier_name
 
-    if run_sync:
-        from cytomancer.quant.pultra_survival import run
+    from cytomancer.quant.pultra_survival import run
 
-        with dask_client():
-            run(
-                experiment_dir,
-                ExperimentType.CQ1,
-                svm_path,
-                save_annotations,
-                snr_thresh,
-            )
-    else:
-        from cytomancer.quant.tasks import run_pultra_survival
-
-        run_pultra_survival.delay(
-            str(experiment_dir), ExperimentType.CQ1, str(svm_path), save_annotations
+    with dask_client():
+        run(
+            experiment_dir,
+            ExperimentType.CQ1,
+            svm_path,
+            save_annotations,
+            snr_thresh,
         )
 
 
@@ -123,8 +110,6 @@ def neurite_quant(
     experiment_dir: Path, experiment_type: ExperimentType, model_name: str
 ):
     model_path = config.models_dir / model_name
-
-    from cytomancer.quant.tasks import run_neurite_quant
 
     run_neurite_quant(str(experiment_dir), experiment_type, str(model_path))
 
