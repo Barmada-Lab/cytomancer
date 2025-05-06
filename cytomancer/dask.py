@@ -15,4 +15,5 @@ def dask_client():
         ) as cluster,
         Client(cluster) as client,
     ):
+        print(f"Dask dashboard: {cluster.dashboard_link}")
         yield client

@@ -97,21 +97,24 @@ def train_pultra_classifier(
         logger.info(f"Saved classifier to {output_path}")
 
 
-@click.command("neurite-quant")
-@experiment_dir_argument()
-@experiment_type_argument()
+@click.command("neurite-seg")
+@click.argument(
+    "work_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
 @click.option(
     "--model-name",
     type=str,
     default="ilastish_neurite_seg.joblib",
     help="Path to ilastik model",
 )
-def neurite_quant(
-    experiment_dir: Path, experiment_type: ExperimentType, model_name: str
-):
+def neurite_seg(work_dir: Path, model_name: str):
     model_path = config.models_dir / model_name
 
-    run_neurite_quant(str(experiment_dir), experiment_type, str(model_path))
+    from cytomancer.quant.neurite_seg import run
+
+    with dask_client():
+        run(work_dir, model_path)
 
 
 @click.command("stardist-seg")
@@ -155,4 +158,4 @@ def register(cli: click.Group):
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
-    quant_group.add_command(neurite_quant)
+    quant_group.add_command(neurite_seg)

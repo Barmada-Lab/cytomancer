@@ -41,6 +41,7 @@ dependencies = [
     "pandas-stubs>=2.2.3.241126",
     "acquisition-io",
     "ome-types>=0.6.1",
+    "pywavelets>=1.8.0",
 ]
 
 [project.scripts]

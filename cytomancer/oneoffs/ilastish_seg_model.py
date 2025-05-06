@@ -41,7 +41,10 @@ def preprocess_image(raw_image):
         for s, g in zip(SIGMAS[1:], gaussian_stack[1:], strict=False)
     ]
     hessian_stack = [
-        hessian_matrix(raw_image, sigma=s, mode="nearest") for s in SIGMAS[1:]
+        hessian_matrix(
+            raw_image, sigma=s, mode="nearest", use_gaussian_derivatives=True
+        )
+        for s in SIGMAS[1:]
     ]
     hessian_eig_stack = [
         (f"hess_eig-{s}", hessian_matrix_eigvals(hess)[0])
