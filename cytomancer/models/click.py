@@ -40,7 +40,7 @@ def pultra_survival(
     """
     svm_path = config.models_dir / classifier_name
 
-    from cytomancer.quant.pultra_survival import run
+    from cytomancer.models.pultra_survival import run
 
     with dask_client():
         run(
@@ -82,7 +82,7 @@ def train_pultra_classifier(
     """
     Train a classifier for pultra survival analysis.
     """
-    from cytomancer.quant.pultra_classifier import do_train
+    from cytomancer.models.pultra_classifier import do_train
 
     classifier = do_train(
         cvat_project_name,
@@ -95,26 +95,6 @@ def train_pultra_classifier(
     if classifier is not None:
         joblib.dump(classifier, output_path)
         logger.info(f"Saved classifier to {output_path}")
-
-
-@click.command("neurite-seg")
-@click.argument(
-    "work_dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-)
-@click.option(
-    "--model-name",
-    type=str,
-    default="ilastish_neurite_seg.joblib",
-    help="Path to ilastik model",
-)
-def neurite_seg(work_dir: Path, model_name: str):
-    model_path = config.models_dir / model_name
-
-    from cytomancer.quant.neurite_seg import run
-
-    with dask_client():
-        run(work_dir, model_path)
 
 
 @click.command("stardist-seg")
@@ -143,7 +123,7 @@ def neurite_seg(work_dir: Path, model_name: str):
 def stardist_nuc_seg(
     experiment_dir: Path, model_name: str, preprocess_method: str, clahe_clip: float
 ):
-    from cytomancer.quant.stardist_seg import run
+    from cytomancer.models.stardist_seg import run
 
     with dask_client():
         run(experiment_dir, model_name, preprocess_method, clahe_clip)
@@ -158,4 +138,3 @@ def register(cli: click.Group):
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
-    quant_group.add_command(neurite_seg)

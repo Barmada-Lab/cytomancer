@@ -5,8 +5,6 @@ from acquisition_io import ExperimentType, load_experiment
 
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
-from cytomancer.experiment import ExperimentType
-from cytomancer.utils import load_experiment
 
 from .dump import dump_tiffs_cli
 
