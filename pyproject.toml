@@ -43,6 +43,7 @@ dependencies = [
     "ome-types>=0.6.1",
     "pywavelets>=1.8.0",
     "torch>=2.7.0",
+    "torchvision>=0.22.0",
 ]
 
 [project.scripts]
