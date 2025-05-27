@@ -44,7 +44,7 @@ dependencies = [
     "pywavelets>=1.8.0",
     "torch>=2.7.0",
     "torchvision>=0.22.0",
-    "wandb>=0.19.11",
+    "wandb==0.18.7",
     "albumentations>=2.0.6",
 ]
 

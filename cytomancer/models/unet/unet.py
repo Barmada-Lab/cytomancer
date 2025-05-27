@@ -12,6 +12,10 @@ class UNet(nn.Module):
         bilinear: bool = True,
     ):
         super().__init__()
+        self.n_channels = n_channels
+        self.n_classes = n_classes
+        self.kernel_size = kernel_size
+        self.bilinear = bilinear
 
         self.inc = DoubleConv(n_channels, 64, kernel_size)
         self.down1 = EncoderBlock(64, 128, kernel_size)

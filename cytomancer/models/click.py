@@ -8,6 +8,7 @@ from acquisition_io import ExperimentType
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
 from cytomancer.dask import dask_client
+from cytomancer.models.unet.train import run as train_model
 
 logger = logging.getLogger(__name__)
 
@@ -138,3 +139,4 @@ def register(cli: click.Group):
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
+    quant_group.add_command(train_model)
