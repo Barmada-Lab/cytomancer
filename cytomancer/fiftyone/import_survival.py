@@ -7,7 +7,6 @@ from pandas import Timestamp
 from skimage.measure import regionprops
 from tqdm import tqdm
 
-from cytomancer.quant.pultra_survival import LIVE
 from cytomancer.utils import iter_idx_prod
 
 
@@ -16,7 +15,7 @@ def add_detection_results(sample: fo.Sample, labels: np.ndarray, preds: np.ndarr
     for props in regionprops(labels):
         mask = labels == props.label
         prediction = np.bincount(preds[mask]).argmax()
-        pred_label = "live" if prediction == LIVE else "dead"
+        pred_label = "live" if prediction == 1 else "dead"
         detection = fo.Detection.from_mask(mask, label=pred_label)
         detections.append(detection)
     sample["predictions"] = fo.Detections(detections=detections)

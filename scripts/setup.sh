@@ -37,7 +37,10 @@ idem_patch_bashprofile() {
 }
 
 if [ ! -f $HOME/.bash_profile ]; then
-    touch $HOME/.bash_profile
+touch $HOME/.bash_profile
+echo "if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi" >> $HOME/.bash_profile
 fi
 
 idem_patch_bashprofile 'export CYTOMANCER_MODELS_DIR=/nfs/turbo/umms-sbarmada/shared/models'
