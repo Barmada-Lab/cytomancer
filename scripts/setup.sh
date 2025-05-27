@@ -25,12 +25,8 @@ if [ ! -e $HOME/Desktop/ImageJ2.desktop ]; then
     cp $TURBO/shared/Fiji.app/ImageJ2.desktop $HOME/Desktop
 fi
 
-
-if [ -d $HOME/.pyenv ]; then
-    rm $HOME/.pyenv -rf
-fi
-
-git clone https://github.com/pyenv/pyenv $HOME/.pyenv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv python install 3.12
 
 idem_patch_bashprofile() {
     # idempotently modifies the user's bashprofile with the passed string.
@@ -44,13 +40,8 @@ if [ ! -f $HOME/.bash_profile ]; then
     touch $HOME/.bash_profile
 fi
 
-idem_patch_bashprofile 'export PATH=$PATH:$HOME/.local/bin:$HOME/bin'
-idem_patch_bashprofile 'export PATH=$HOME/.pyenv/shims:$PATH'
-idem_patch_bashprofile 'export PATH=$HOME/.pyenv/bin:$PATH'
-idem_patch_bashprofile 'eval "$(pyenv init -)"'
+idem_patch_bashprofile 'export CYTOMANCER_MODELS_DIR=/nfs/turbo/umms-sbarmada/shared/models'
+idem_patch_bashprofile 'export CYTOMANCER_COLLECTIONS_DIR=/nfs/turbo/umms-sbarmada/shared/collections'
 source ~/.bash_profile
 
-pyenv install 3.10.6
-pyenv global 3.10.6
-pip install pipx
-pipx ensurepath
+uv tool install git+https://github.com/Barmada-Lab/cytomancer
