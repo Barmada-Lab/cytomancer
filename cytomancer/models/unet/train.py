@@ -201,10 +201,6 @@ def train_model(
                 ):
                     masks_pred = model(images)
                     loss = criterion(masks_pred.squeeze(1), true_masks.float())
-                    # loss += dice_loss(
-                    #     F.sigmoid(masks_pred.squeeze(1)),
-                    #     true_masks.float(),
-                    # )
 
                 optimizer.zero_grad(set_to_none=True)
                 grad_scaler.scale(loss).backward()
