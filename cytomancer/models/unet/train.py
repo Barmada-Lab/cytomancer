@@ -33,7 +33,7 @@ from tqdm import tqdm
 
 from cytomancer.io.datasets import MaskSegDataset
 
-from .dice import dice_coeff
+from .dice import dice_coeff, dice_loss
 from .unet import UNet
 
 
@@ -65,7 +65,7 @@ def evaluate(net, dataloader, device, amp):
 
             if not (mask_true.min() >= 0 and mask_true.max() <= 1):
                 raise ValueError("True mask indices should be in [0, 1]")
-            mask_pred = (F.sigmoid(mask_pred) > 0.5).float().squeeze(1)
+            mask_pred = (F.sigmoid(mask_pred) > 0.5).long().squeeze(1)
             # compute the Dice score
             dice_score += dice_coeff(mask_pred, mask_true)
 
@@ -90,10 +90,12 @@ def train_model(
 ):
     train_transforms = A.Compose(
         [
-            A.RandomBrightnessContrast(p=0.5),
-            A.RandomGamma(p=0.5),
-            A.CLAHE(p=1, clip_limit=(2, 2)),
-            A.Normalize(normalization="min_max"),
+            A.RandomBrightnessContrast(
+                p=0.5, brightness_limit=(-0.3, 0.3), contrast_limit=(-0.3, 0.3)
+            ),
+            A.RandomGamma(p=0.5, gamma_limit=(70, 130)),
+            A.CLAHE(p=1, clip_limit=(10, 10)),
+            A.Normalize(normalization="standard", mean=0, std=1),
             A.RandomCrop(height=256, width=256, p=1),
             A.HorizontalFlip(p=0.5),
             A.VerticalFlip(p=0.5),
@@ -107,9 +109,9 @@ def train_model(
 
     val_transforms = A.Compose(
         [
-            A.CLAHE(p=1, clip_limit=(2, 2)),
-            A.Normalize(normalization="min_max"),
-            A.Crop(x_max=256, y_max=256, p=1),
+            A.CLAHE(p=1, clip_limit=(10, 10)),
+            A.Normalize(normalization="standard", mean=0, std=1),
+            A.Crop(x_max=512, y_max=512),
             A.ToTensorV2(p=1),
         ]
     )
@@ -201,6 +203,9 @@ def train_model(
                 ):
                     masks_pred = model(images)
                     loss = criterion(masks_pred.squeeze(1), true_masks.float())
+                    loss += dice_loss(
+                        F.sigmoid(masks_pred.squeeze(1)), true_masks.float()
+                    )
 
                 optimizer.zero_grad(set_to_none=True)
                 grad_scaler.scale(loss).backward()
