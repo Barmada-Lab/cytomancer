@@ -1,6 +1,6 @@
 [project]
 name = "cytomancer"
-version = "1.4.1"
+version = "1.4.2"
 description= "Tools for cellular divination"
 readme = "README.md"
 requires-python = "==3.12.*"
@@ -67,7 +67,7 @@ dev-dependencies = [
 ]
 
 [tool.uv.sources]
-acquisition-io = { git = "https://github.com/Barmada-Lab/acquisition-io", rev = "v0.1.6" }
+acquisition-io = { git = "https://github.com/Barmada-Lab/acquisition-io", rev = "v0.1.7" }
 
 [build-system]
 requires = ["hatchling"]
