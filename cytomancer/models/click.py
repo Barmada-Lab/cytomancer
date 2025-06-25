@@ -8,7 +8,6 @@ from acquisition_io import ExperimentType
 from cytomancer.click_utils import experiment_dir_argument, experiment_type_argument
 from cytomancer.config import config
 from cytomancer.dask import dask_client
-from cytomancer.models.unet.train import run as train_model
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +129,50 @@ def stardist_nuc_seg(
         run(experiment_dir, model_name, preprocess_method, clahe_clip)
 
 
+@click.command(name="unet-train")
+@click.option("--dataset-path", type=Path, help="Path to the training dataset")
+@click.option(
+    "--checkpoint-path",
+    type=Path,
+    default=Path("./checkpoints/"),
+    help="Path to training checkpoints",
+)
+@click.option("--epochs", type=int, default=100, help="Number of epochs")
+@click.option("--batch-size", type=int, default=16, help="Batch size")
+@click.option("--learning-rate", type=float, default=1e-5, help="Learning rate")
+@click.option("--momentum", type=float, default=0.999, help="Momentum")
+@click.option("--amp", type=bool, default=False, help="AMP")
+@click.option("--bilinear", type=bool, default=True, help="Bilinear")
+@click.option("--n-classes", type=int, default=1)
+@click.option("--load", type=str, default=None, help="Load model")
+def unet_train(
+    dataset_path: Path,
+    checkpoint_path: Path,
+    epochs: int,
+    batch_size: int,
+    learning_rate: float,
+    momentum: float,
+    amp: bool,
+    bilinear: bool,
+    n_classes: int,
+    load: str | None,
+):
+    from cytomancer.models.unet.train import run
+
+    run(
+        dataset_path,
+        checkpoint_path,
+        epochs,
+        batch_size,
+        learning_rate,
+        momentum,
+        amp,
+        bilinear,
+        n_classes,
+        load,
+    )
+
+
 def register(cli: click.Group):
     @cli.group("quant", help="Tools for quantifying data")
     @click.pass_context
@@ -139,4 +182,4 @@ def register(cli: click.Group):
     quant_group.add_command(train_pultra_classifier)
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
-    quant_group.add_command(train_model)
+    quant_group.add_command(unet_train)

@@ -22,7 +22,6 @@ import logging
 from pathlib import Path
 
 import albumentations as A
-import click
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -271,22 +270,6 @@ def train_model(
             logging.info(f"Checkpoint {epoch} saved!")
 
 
-@click.command(name="unet-train")
-@click.option("--dataset-path", type=Path, help="Path to the training dataset")
-@click.option(
-    "--checkpoint-path",
-    type=Path,
-    default=Path("./checkpoints/"),
-    help="Path to training checkpoints",
-)
-@click.option("--epochs", type=int, default=100, help="Number of epochs")
-@click.option("--batch-size", type=int, default=16, help="Batch size")
-@click.option("--learning-rate", type=float, default=1e-5, help="Learning rate")
-@click.option("--momentum", type=float, default=0.999, help="Momentum")
-@click.option("--amp", type=bool, default=False, help="AMP")
-@click.option("--bilinear", type=bool, default=True, help="Bilinear")
-@click.option("--n-classes", type=int, default=1)
-@click.option("--load", type=str, default=None, help="Load model")
 def run(
     dataset_path: Path,
     checkpoint_path: Path,
