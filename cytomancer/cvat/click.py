@@ -245,4 +245,5 @@ def register(cli: click.Group):
     cvat_group.add_command(nuc_cyto)
     cvat_group.add_command(nuc_cyto_legacy)
     cvat_group.add_command(backup_project)
+    cvat_group.add_command(restore_project)
     cvat_group.add_command(analyze_survival_legacy)

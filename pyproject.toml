@@ -1,6 +1,6 @@
 [project]
 name = "cytomancer"
-version = "1.4.3"
+version = "1.4.4"
 description= "Tools for cellular divination"
 readme = "README.md"
 requires-python = "==3.12.*"
