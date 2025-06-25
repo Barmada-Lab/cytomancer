@@ -196,7 +196,7 @@ def nuc_cyto(
     )
 
 
-@click.command("export")
+@click.command("backup")
 @experiment_dir_argument()
 @click.option(
     "--project_name",
@@ -204,16 +204,29 @@ def nuc_cyto(
     default="",
     help="Name of the CVAT project to export. Defaults to experiment directory name",
 )
-def export_annotations(experiment_dir: Path, project_name: str):
+def backup_project(experiment_dir: Path, project_name: str):
     from cytomancer.config import config
 
-    from .export import do_export as export_annotations_impl
+    from .backup import backup as backup_impl
     from .helpers import new_client_from_config
 
     if project_name == "":
         project_name = experiment_dir.name
+
     client = new_client_from_config(config)
-    export_annotations_impl(client, project_name, experiment_dir)
+    backup_impl(client, project_name, experiment_dir)
+
+
+@click.command("restore")
+@experiment_dir_argument()
+def restore_project(experiment_dir: Path):
+    from cytomancer.config import config
+
+    from .helpers import new_client_from_config
+    from .restore import restore as restore_impl
+
+    client = new_client_from_config(config)
+    restore_impl(client, experiment_dir)
 
 
 def register(cli: click.Group):
@@ -231,5 +244,5 @@ def register(cli: click.Group):
     cvat_group.add_command(measure)
     cvat_group.add_command(nuc_cyto)
     cvat_group.add_command(nuc_cyto_legacy)
-    cvat_group.add_command(export_annotations)
+    cvat_group.add_command(backup_project)
     cvat_group.add_command(analyze_survival_legacy)

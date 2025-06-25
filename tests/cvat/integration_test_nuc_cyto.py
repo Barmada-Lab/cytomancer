@@ -4,12 +4,12 @@ import cv2
 import numpy as np
 import pandas as pd
 import xarray as xr
+from cvat.backup import export
 from pycocotools.coco import COCO
 from skimage import morphology
 
 from cytomancer.config import config
 from cytomancer.cvat.colocalize import nuc_cyto
-from cytomancer.cvat.export import export
 from cytomancer.cvat.helpers import get_project, new_client_from_config
 from cytomancer.cvat.upload import do_upload
 
