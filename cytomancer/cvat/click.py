@@ -86,9 +86,12 @@ def auth(cvat_username, cvat_password):
     "--clahe-clip",
     type=float,
     default=0.00,
-    help="""Clip limit for contrast limited adaptive histogram equalization. Enhances
-              contrast for easier annotation of dim structures, but may misrepresent relative
-              intensities within each field. Set above 0 to enable. (recommended 0.01-0.05) """,
+    help=(
+        "Clip limit for contrast limited adaptive histogram equalization. Enhances"
+        "contrast for easier annotation of dim structures, but may misrepresent"
+        "relative intensities within each field. Set above 0 to enable."
+        "(recommended 0.01-0.05)"
+    ),
 )
 @click.option(
     "--blind",
@@ -194,7 +197,10 @@ def nuc_cyto(
     )
 
 
-@click.command("backup")
+@click.command(
+    "backup",
+    help="Backup a CVAT project to $experiment_dir/results/cvat_backup.zip",
+)
 @experiment_dir_argument()
 @click.option(
     "--project_name",
@@ -215,19 +221,18 @@ def backup_project(experiment_dir: Path, project_name: str):
     backup_impl(client, project_name, experiment_dir)
 
 
-@click.command("restore")
-@experiment_dir_argument()
-def restore_project(experiment_dir: Path):
+@click.command("restore", help="Restore a CVAT project from a backup zip.")
+@click.argument("backup_path", type=click.Path(exists=True, path_type=Path))
+def restore_project(backup_path: Path):
     from cytomancer.config import config
 
     from .helpers import new_client_from_config
-    from .restore import restore as restore_impl
 
     client = new_client_from_config(config)
-    restore_impl(client, experiment_dir)
+    client.projects.create_from_backup(backup_path)
 
 
-@click.command("export")
+@click.command("export-rois")
 @experiment_dir_argument()
 @click.option(
     "--project_name",
