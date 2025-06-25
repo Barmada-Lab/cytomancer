@@ -6,9 +6,7 @@ from cytomancer.click_utils import experiment_dir_argument, experiment_type_argu
 from cytomancer.config import config
 
 from .helpers import test_cvat_credentials
-from .legacy_survival import cli_entry as analyze_survival_legacy
 from .measure import measure_experiment, measurement_fn_lut
-from .nuc_cyto_legacy import cli_entry as nuc_cyto_legacy
 
 
 @click.command("auth")
@@ -229,6 +227,26 @@ def restore_project(experiment_dir: Path):
     restore_impl(client, experiment_dir)
 
 
+@click.command("export")
+@experiment_dir_argument()
+@click.option(
+    "--project_name",
+    type=str,
+    default="",
+    help="Name of the CVAT project to export. Defaults to experiment directory name",
+)
+def export_annotations(experiment_dir: Path, project_name: str):
+    from cytomancer.config import config
+
+    from .export import do_export as export_annotations_impl
+    from .helpers import new_client_from_config
+
+    if project_name == "":
+        project_name = experiment_dir.name
+    client = new_client_from_config(config)
+    export_annotations_impl(client, project_name, experiment_dir)
+
+
 def register(cli: click.Group):
     @cli.group("cvat", help="Tools for working with CVAT")
     @click.pass_context
@@ -243,7 +261,6 @@ def register(cli: click.Group):
     cvat_group.add_command(upload_experiment)
     cvat_group.add_command(measure)
     cvat_group.add_command(nuc_cyto)
-    cvat_group.add_command(nuc_cyto_legacy)
     cvat_group.add_command(backup_project)
     cvat_group.add_command(restore_project)
-    cvat_group.add_command(analyze_survival_legacy)
+    cvat_group.add_command(export_annotations)
