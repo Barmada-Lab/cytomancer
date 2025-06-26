@@ -122,7 +122,7 @@ def run(
                 continue
 
             predictions, _ = model.predict_instances(img)  # type: ignore
-            filename = uuid4().hex + ".tif"
+            filename = f"{uuid4().hex}.tif"
             tifffile.imwrite(scratch_subdir / filename, predictions, compression="lzw")
             row_vals = coords.tolist() + [filename]
             summary.append(row_vals)

@@ -173,6 +173,26 @@ def unet_train(
     )
 
 
+@click.command(name="neurite-quant")
+@experiment_dir_argument()
+@experiment_type_argument()
+@click.option(
+    "--model-path",
+    type=click.Path(exists=True),
+    help="Path to the model to use for segmentation; should be a .pth file containing a trained UNet model",
+    default=config.models_dir / "neurite_seg.pth",
+)
+def neurite_quant(
+    experiment_dir: Path,
+    experiment_type: ExperimentType,
+    model_path: Path,
+):
+    from cytomancer.models.neurite_quant import run_experiment
+
+    with dask_client():
+        run_experiment(experiment_dir, experiment_type, model_path)
+
+
 def register(cli: click.Group):
     @cli.group("quant", help="Tools for quantifying data")
     @click.pass_context
@@ -183,3 +203,4 @@ def register(cli: click.Group):
     quant_group.add_command(pultra_survival)
     quant_group.add_command(stardist_nuc_seg)
     quant_group.add_command(unet_train)
+    quant_group.add_command(neurite_quant)
