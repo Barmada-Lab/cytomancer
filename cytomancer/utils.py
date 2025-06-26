@@ -4,6 +4,7 @@ from itertools import product
 from typing import TypeVar
 
 import xarray as xr
+from tqdm import tqdm
 
 T = TypeVar("T", xr.DataArray, xr.Dataset)
 
@@ -23,7 +24,9 @@ def apply_ufunc_xy(func, arr: xr.DataArray, ufunc_kwargs=None, **kwargs):
     )
 
 
-def iter_idx_prod(arr: T, subarr_dims=None, shuffle=False) -> Generator[T, None, None]:
+def iter_idx_prod(
+    arr: T, subarr_dims=None, shuffle=False, progress=False
+) -> Generator[T, None, None]:
     """
     Iterates over the product of an array's indices. Can be used to iterate over
     all the (coordinate-less) XY(Z) planes in an experiment.
@@ -34,6 +37,8 @@ def iter_idx_prod(arr: T, subarr_dims=None, shuffle=False) -> Generator[T, None,
     idxs = list(product(*[arr.indexes[name] for name in indices]))
     if shuffle:
         random.shuffle(idxs)
+    if progress:
+        idxs = tqdm(idxs)
     for coords in idxs:
         selector = dict(zip(indices, coords, strict=False))
         yield arr.sel(selector)
